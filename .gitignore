@@ -1,0 +1,7 @@
+.DS_Store
+/node_modules/
+/dist
+/lib
+/tmp
+/.nyc_output
+/coverage
