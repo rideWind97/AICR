@@ -5,3 +5,5 @@
 /tmp
 /.nyc_output
 /coverage
+
+.env-local
