@@ -17,7 +17,86 @@ router.get('/health', (req, res) => {
 });
 
 /**
- * GitLab Webhook 入口
+ * 查询所有任务状态
+ */
+router.get('/tasks', (req, res) => {
+  try {
+    const eventHandler = new EventHandler();
+    const tasks = eventHandler.getAllTaskStatus();
+    
+    res.json({
+      success: true,
+      data: {
+        total: tasks.length,
+        tasks: tasks
+      }
+    });
+  } catch (err) {
+    Logger.error('查询任务状态失败', err);
+    res.status(500).json({ 
+      error: 'Failed to get task status',
+      message: err.message
+    });
+  }
+});
+
+/**
+ * 查询特定任务状态
+ */
+router.get('/tasks/:taskId', (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const eventHandler = new EventHandler();
+    const task = eventHandler.getTaskStatus(taskId);
+    
+    if (!task) {
+      return res.status(404).json({ 
+        error: 'Task not found',
+        taskId 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: task
+    });
+  } catch (err) {
+    Logger.error('查询任务状态失败', err);
+    res.status(500).json({ 
+      error: 'Failed to get task status',
+      message: err.message
+    });
+  }
+});
+
+/**
+ * 查询项目相关任务状态
+ */
+router.get('/projects/:projectId/tasks', (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const eventHandler = new EventHandler();
+    const tasks = eventHandler.getProjectTaskStatus(parseInt(projectId));
+    
+    res.json({
+      success: true,
+      data: {
+        projectId: parseInt(projectId),
+        total: tasks.length,
+        tasks: tasks
+      }
+    });
+  } catch (err) {
+    Logger.error('查询项目任务状态失败', err);
+    res.status(500).json({ 
+      error: 'Failed to get project task status',
+      message: err.message
+    });
+  }
+});
+
+/**
+ * GitLab Webhook 入口 - 异步处理版本
  */
 router.post('/gitlab/webhook', async (req, res) => {
   const startTime = Logger.startTimer('Webhook处理');
@@ -61,7 +140,7 @@ router.post('/gitlab/webhook', async (req, res) => {
       return res.status(400).json({ error: 'Missing project ID or MR IID' });
     }
 
-    // 处理事件
+    // 处理事件 - 异步启动代码审查任务
     const eventHandler = new EventHandler();
     const result = await eventHandler.handleMergeRequestEvent(event);
     
@@ -69,10 +148,16 @@ router.post('/gitlab/webhook', async (req, res) => {
       projectId,
       mrIid,
       action,
-      success: result.success
+      success: result.success,
+      status: 'async_started'
     });
     
-    res.status(200).json(result);
+    // 快速响应，不等待代码审查完成
+    res.status(200).json({
+      ...result,
+      note: 'Code review task started asynchronously. Use /api/tasks to check status.',
+      webhook_response_time: Date.now() - startTime
+    });
 
   } catch (err) {
     Logger.error('Webhook处理失败', err);
