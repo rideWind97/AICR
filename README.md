@@ -1,13 +1,18 @@
-# MG AI Code Reviewer
+# AICR - AI Code Reviewer
 
 一个基于 AI 的 GitLab 代码审查工具，能够自动分析代码变更并生成智能审查意见。
+
+## 🎥 演示视频
+
+观看 [demo.mp4](./20250824-155251.mp4) 了解 AICR 的实际运行效果。
 
 ## 🚀 功能特性
 
 - **智能代码审查**：使用 DeepSeek AI 自动分析代码质量和潜在问题
 - **行内评论**：在 GitLab MR 的具体代码行下添加针对性评论
 - **增量审查**：避免重复评论，只审查新增的代码
-- **性能优化**：支持大批量代码变更的高效处理
+- **高性能并发**：支持 n 个代码组同时调用 n 次 AI 分析
+- **实时返回结果**：每当 AI 返回审查结果时立即发送给 GitLab
 - **Webhook 集成**：自动响应 GitLab 的 push 和 merge_request 事件
 - **结构化日志**：完整的操作记录和性能监控
 
@@ -35,7 +40,8 @@
 ## 📁 项目结构
 
 ```
-mg-ai-code-reviewer/
+AICR/
+├── demo.mp4              # 演示视频
 ├── server/                          # 服务器端代码
 │   ├── config/                      # 配置文件
 │   │   ├── index.js                # 主配置
@@ -86,7 +92,7 @@ mg-ai-code-reviewer/
 
 ```bash
 git clone <repository-url>
-cd mg-ai-code-reviewer
+cd AICR
 ```
 
 ### 2. 安装依赖
@@ -156,7 +162,7 @@ npm start
 在 GitLab 项目中添加 Webhook：
 
 - **URL**: `http://your-server:3001/api/gitlab/webhook`
-- **触发事件**: 
+- **触发事件**:
   - `Push events`
   - `Merge request events`
 - **SSL 验证**: 根据环境选择
@@ -179,32 +185,55 @@ npm start
 node test-webhook.js
 ```
 
+## 🚀 核心优势
+
+### 高性能并发处理
+
+- **n 个代码组同时分析**：支持多个代码变更单元并行处理
+- **实时返回结果**：每当 AI 分析完成立即返回，无需等待全部完成
+- **智能分组策略**：自动将相关代码行分组，提高审查效率
+
+### 智能审查算法
+
+- **预过滤机制**：快速过滤明显不需要审查的代码
+- **增量审查**：避免重复评论，只关注新增代码
+- **上下文感知**：分析整个代码段的逻辑，而非单行代码
+
+### 缓存和优化
+
+- **智能缓存**：缓存审查结果，避免重复 AI 调用
+- **批量处理**：优化 API 调用，减少网络开销
+- **降级机制**：当批量处理失败时自动降级为单个处理
+
 ## 📊 配置说明
 
 ### 审查配置
 
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| `MAX_LINES_PER_BATCH` | 每批处理的最大行数 | 50 |
-| `MAX_FILES_CONCURRENT` | 并发处理的文件数 | 3 |
-| `MIN_LINES_TO_REVIEW` | 最小审查行数 | 3 |
-| `ENABLE_INLINE_COMMENTS` | 启用行内评论 | true |
-| `ADD_SUMMARY_COMMENT` | 添加总结评论 | true |
+
+| 配置项                   | 说明               | 默认值 |
+| ------------------------ | ------------------ | ------ |
+| `MAX_LINES_PER_BATCH`    | 每批处理的最大行数 | 50     |
+| `MAX_FILES_CONCURRENT`   | 并发处理的文件数   | 3      |
+| `MIN_LINES_TO_REVIEW`    | 最小审查行数       | 3      |
+| `ENABLE_INLINE_COMMENTS` | 启用行内评论       | true   |
+| `ADD_SUMMARY_COMMENT`    | 添加总结评论       | true   |
 
 ### 性能配置
 
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| `GITLAB_TIMEOUT` | GitLab API 超时时间 | 10000ms |
-| `GITLAB_MAX_RETRIES` | GitLab API 重试次数 | 3 |
-| `DEEPSEEK_TIMEOUT` | AI API 超时时间 | 30000ms |
+
+| 配置项               | 说明                | 默认值  |
+| -------------------- | ------------------- | ------- |
+| `GITLAB_TIMEOUT`     | GitLab API 超时时间 | 10000ms |
+| `GITLAB_MAX_RETRIES` | GitLab API 重试次数 | 3       |
+| `DEEPSEEK_TIMEOUT`   | AI API 超时时间     | 30000ms |
 
 ### 日志配置
 
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| `LOG_LEVEL` | 日志级别 | info |
-| `ENABLE_DEBUG_LOGS` | 启用调试日志 | false |
+
+| 配置项              | 说明         | 默认值 |
+| ------------------- | ------------ | ------ |
+| `LOG_LEVEL`         | 日志级别     | info   |
+| `ENABLE_DEBUG_LOGS` | 启用调试日志 | false  |
 
 ## 🔍 监控和日志
 
@@ -217,7 +246,7 @@ curl http://your-server:3001/api/health
 ### 日志级别
 
 - **error**: 错误信息
-- **warn**: 警告信息  
+- **warn**: 警告信息
 - **info**: 一般信息
 - **debug**: 调试信息
 
@@ -235,18 +264,19 @@ curl http://your-server:3001/api/health
 ### 常见问题
 
 1. **环境变量未加载**
+
    - 检查 `.env` 文件是否存在
    - 确认文件路径正确
-
 2. **GitLab API 调用失败**
+
    - 验证 `BOT_TOKEN` 权限
    - 检查网络连接和防火墙
-
 3. **AI 服务超时**
+
    - 增加 `DEEPSEEK_TIMEOUT` 值
    - 检查 DeepSeek API 状态
-
 4. **Webhook 接收失败**
+
    - 确认服务器端口开放
    - 检查 GitLab Webhook 配置
 

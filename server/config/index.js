@@ -5,7 +5,7 @@ module.exports = {
   gitlab: {
     url: process.env.GITLAB_URL,
     token: process.env.BOT_TOKEN,
-    timeout: parseInt(process.env.GITLAB_TIMEOUT) || 10000,
+    timeout: parseInt(process.env.GITLAB_TIMEOUT) || 1000000,
     maxRetries: parseInt(process.env.GITLAB_MAX_RETRIES) || 3
   },
   ai: {
@@ -14,7 +14,7 @@ module.exports = {
     model: process.env.DEEPSEEK_MODEL || 'deepseek-coder',
     maxTokens: parseInt(process.env.DEEPSEEK_MAX_TOKENS) || 2000,
     temperature: parseFloat(process.env.DEEPSEEK_TEMPERATURE) || 0.3,
-    timeout: parseInt(process.env.DEEPSEEK_TIMEOUT) || 30000
+    timeout: parseInt(process.env.DEEPSEEK_TIMEOUT) || 3000000
   },
   server: {
     port: parseInt(process.env.PORT) || 3001,

@@ -3,7 +3,7 @@
  */
 module.exports = {
   GITLAB: {
-    API_TIMEOUT: 10000,
+    API_TIMEOUT: 1000000,
     MAX_RETRIES: 3,
     RETRY_DELAY: 1000,
     SUPPORTED_ACTIONS: ['open', 'reopen', 'update'],
@@ -12,7 +12,7 @@ module.exports = {
   AI: {
     MAX_TOKENS: 2000,
     TEMPERATURE: 0.3,
-    TIMEOUT: 30000,
+    TIMEOUT: 3000000,
     MAX_REVIEW_LENGTH: 200,
     MIN_REVIEW_LENGTH: 15
   },

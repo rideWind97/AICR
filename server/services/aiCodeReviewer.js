@@ -3,7 +3,7 @@ const { createReviewPrompt } = require('../utils/helpers');
 const Logger = require('../utils/logger');
 
 /**
- * AI 代码审查服务类 - 性能优化版本
+ * AI 代码审查服务类 - 高性能优化版本
  */
 class AICodeReviewer {
   constructor() {
@@ -15,17 +15,48 @@ class AICodeReviewer {
     
     // 性能优化配置
     this.maxConcurrentFiles = parseInt(process.env.MAX_FILES_CONCURRENT) || 5;
-    this.maxGroupsPerBatch = parseInt(process.env.MAX_GROUPS_PER_BATCH) || 10;
-    this.maxLinesPerGroup = parseInt(process.env.MAX_LINES_PER_GROUP) || 30;
-    this.requestTimeout = parseInt(process.env.AI_REQUEST_TIMEOUT) || 8000;
+    this.maxGroupsPerBatch = parseInt(process.env.MAX_GROUPS_PER_BATCH) || 15;
+    this.maxLinesPerGroup = parseInt(process.env.MAX_LINES_PER_GROUP) || 40;
+    this.requestTimeout = parseInt(process.env.AI_REQUEST_TIMEOUT) || 6000;
+    this.maxConcurrentAI = parseInt(process.env.MAX_CONCURRENT_AI) || 3;
     
     // 缓存机制
     this.reviewCache = new Map();
     this.cacheExpiry = 24 * 60 * 60 * 1000; // 24小时过期
+    
+    // 预过滤规则
+    this.skipPatterns = [
+      /^\s*\/\/\s*TODO:/i,
+      /^\s*\/\/\s*FIXME:/i,
+      /^\s*\/\/\s*NOTE:/i,
+      /^\s*\/\*.*\*\/\s*$/,
+      /^\s*console\.log\s*\(/i,
+      /^\s*console\.warn\s*\(/i,
+      /^\s*console\.error\s*\(/i,
+      /^\s*debugger\s*;?\s*$/,
+      /^\s*import\s+.*\s+from\s+['"]/,
+      /^\s*export\s+/,
+      /^\s*}\s*$/,
+      /^\s*{\s*$/,
+      /^\s*\)\s*$/,
+      /^\s*\(\s*$/,
+      /^\s*;\s*$/,
+      /^\s*,\s*$/,
+      /^\s*\[\s*\]\s*$/,
+      /^\s*{\s*}\s*$/
+    ];
+    
+    // 代码质量快速检查规则
+    this.quickCheckRules = {
+      minLength: 3,
+      maxLength: 200,
+      hasContent: true,
+      notJustWhitespace: true
+    };
   }
 
   /**
-   * 生成代码审查 - 优化版本
+   * 生成代码审查 - 高性能版本
    * @param {Array} changes - 代码变更数组
    * @param {Array} existingComments - 已有的评论数组
    * @returns {Promise<Array>} 每个文件的审查内容数组
@@ -49,7 +80,7 @@ class AICodeReviewer {
         return [];
       }
       
-      // 并发处理文件，但限制并发数
+      // 并行处理文件，但限制并发数
       const fileReviews = await this.processFilesConcurrently(
         significantChanges, 
         existingComments
@@ -130,7 +161,7 @@ class AICodeReviewer {
   }
 
   /**
-   * 为单个文件生成针对性审查 - 优化版本
+   * 为单个文件生成针对性审查 - 高性能版本
    * @param {string} fileName - 文件名
    * @param {string} diff - 文件变更内容
    * @param {Array} existingComments - 已有的评论数组
@@ -144,15 +175,23 @@ class AICodeReviewer {
         return [];
       }
       
+      // 智能预过滤：快速过滤明显不需要审查的代码
+      const filteredLines = this.preFilterCodeLines(changeLines);
+      
+      if (filteredLines.length === 0) {
+        Logger.info(`文件 ${fileName} 所有变更都通过预过滤，跳过AI审查`);
+        return [];
+      }
+      
       // 智能分组：优化分组策略
-      const lineGroups = this.optimizeLineGroups(changeLines);
+      const lineGroups = this.optimizeLineGroups(filteredLines);
       
       if (lineGroups.length === 0) {
         return [];
       }
       
-      // 批量处理：将多个组合并为一个 AI 请求
-      const batchReviews = await this.processGroupsInBatches(
+      // 并行批量处理：多个代码组同时处理
+      const batchReviews = await this.processGroupsInParallel(
         fileName, 
         lineGroups, 
         existingComments
@@ -164,6 +203,40 @@ class AICodeReviewer {
       Logger.error(`文件 ${fileName} 审查失败`, err);
       return [];
     }
+  }
+
+  /**
+   * 智能预过滤代码行
+   * @param {Array} changeLines - 变更行数组
+   * @returns {Array} 过滤后的变更行数组
+   */
+  preFilterCodeLines(changeLines) {
+    return changeLines.filter(line => {
+      const content = line.content.trim();
+      
+      // 快速长度检查
+      if (content.length < this.quickCheckRules.minLength) {
+        return false;
+      }
+      
+      if (content.length > this.quickCheckRules.maxLength) {
+        return true; // 长代码行需要审查
+      }
+      
+      // 跳过明显不需要审查的代码
+      for (const pattern of this.skipPatterns) {
+        if (pattern.test(content)) {
+          return false;
+        }
+      }
+      
+      // 检查是否只是空白字符
+      if (!this.quickCheckRules.notJustWhitespace || /^\s*$/.test(content)) {
+        return false;
+      }
+      
+      return true;
+    });
   }
 
   /**
@@ -212,41 +285,26 @@ class AICodeReviewer {
   }
 
   /**
-   * 批量处理代码组
+   * 并行处理代码组
    * @param {string} fileName - 文件名
    * @param {Array} lineGroups - 代码组数组
    * @param {Array} existingComments - 已有评论数组
    * @returns {Promise<Array>} 审查结果数组
    */
-  async processGroupsInBatches(fileName, lineGroups, existingComments) {
+  async processGroupsInParallel(fileName, lineGroups, existingComments) {
     const allReviews = [];
     const batches = this.chunkArray(lineGroups, this.maxGroupsPerBatch);
     
-    for (const batch of batches) {
-      try {
-        // 检查缓存
-        const cacheKey = this.generateCacheKey(fileName, batch);
-        const cachedResult = this.getCachedReview(cacheKey);
-        
-        if (cachedResult) {
-          allReviews.push(...cachedResult);
-          continue;
-        }
-        
-        // 批量生成审查
-        const batchReviews = await this.generateBatchReview(fileName, batch, existingComments);
-        
-        if (batchReviews && batchReviews.length > 0) {
-          // 缓存结果
-          this.cacheReview(cacheKey, batchReviews);
-          allReviews.push(...batchReviews);
-        }
-        
-      } catch (err) {
-        Logger.error('批量审查失败', err, { fileName, batchSize: batch.length });
-        // 降级为单个处理
-        const fallbackReviews = await this.processGroupsIndividually(fileName, batch, existingComments);
-        allReviews.push(...fallbackReviews);
+    // 并行处理多个批次
+    const batchPromises = batches.map(batch => 
+      this.processBatchWithFallback(fileName, batch, existingComments)
+    );
+    
+    const batchResults = await Promise.allSettled(batchPromises);
+    
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled' && result.value) {
+        allReviews.push(...result.value);
       }
     }
     
@@ -254,7 +312,81 @@ class AICodeReviewer {
   }
 
   /**
-   * 批量生成审查意见
+   * 处理批次，带降级机制
+   * @param {string} fileName - 文件名
+   * @param {Array} batch - 代码组批次
+   * @param {Array} existingComments - 已有评论数组
+   * @returns {Promise<Array>} 审查结果数组
+   */
+  async processBatchWithFallback(fileName, batch, existingComments) {
+    try {
+      // 检查缓存
+      const cacheKey = this.generateCacheKey(fileName, batch);
+      const cachedResult = this.getCachedReview(cacheKey);
+      
+      if (cachedResult) {
+        return cachedResult;
+      }
+      
+      // 并行处理批次中的代码组
+      const reviews = await this.processBatchParallel(fileName, batch, existingComments);
+      
+      if (reviews && reviews.length > 0) {
+        // 缓存结果
+        this.cacheReview(cacheKey, reviews);
+      }
+      
+      return reviews;
+      
+    } catch (err) {
+      Logger.error('批次处理失败，降级为单个处理', err, { fileName, batchSize: batch.length });
+      // 降级为单个处理
+      return this.processGroupsIndividually(fileName, batch, existingComments);
+    }
+  }
+
+  /**
+   * 并行处理批次中的代码组
+   * @param {string} fileName - 文件名
+   * @param {Array} batch - 代码组批次
+   * @param {Array} existingComments - 已有评论数组
+   * @returns {Promise<Array>} 审查结果数组
+   */
+  async processBatchParallel(fileName, batch, existingComments) {
+    // 过滤掉已有评论的组
+    const filteredGroups = batch.filter(group => 
+      !this.hasSimilarComment(existingComments, fileName, group.startLine, group.endLine, group.lines)
+    );
+    
+    if (filteredGroups.length === 0) {
+      return [];
+    }
+    
+    // 如果组数较少，使用批量处理
+    if (filteredGroups.length <= 3) {
+      return this.generateBatchReview(fileName, filteredGroups, existingComments);
+    }
+    
+    // 如果组数较多，并行处理多个小批次
+    const subBatches = this.chunkArray(filteredGroups, Math.ceil(filteredGroups.length / 2));
+    const subBatchPromises = subBatches.map(subBatch => 
+      this.generateBatchReview(fileName, subBatch, existingComments)
+    );
+    
+    const subBatchResults = await Promise.allSettled(subBatchPromises);
+    const allReviews = [];
+    
+    for (const result of subBatchResults) {
+      if (result.status === 'fulfilled' && result.value) {
+        allReviews.push(...result.value);
+      }
+    }
+    
+    return allReviews;
+  }
+
+  /**
+   * 批量生成审查意见 - 优化版本
    * @param {string} fileName - 文件名
    * @param {Array} groups - 代码组数组
    * @param {Array} existingComments - 已有评论数组
@@ -262,18 +394,9 @@ class AICodeReviewer {
    */
   async generateBatchReview(fileName, groups, existingComments) {
     try {
-      // 过滤掉已有评论的组
-      const filteredGroups = groups.filter(group => 
-        !this.hasSimilarComment(existingComments, fileName, group.startLine, group.endLine, group.lines)
-      );
-      
-      if (filteredGroups.length === 0) {
-        return [];
-      }
-      
-      // 构建批量审查提示
-      const prompt = this.createBatchReviewPrompt(fileName, filteredGroups);
-      
+      // 构建优化的提示词
+      const prompt = this.createOptimizedPrompt(fileName, groups);
+
       // 调用 AI API
       const response = await axios.post(
         `${this.apiURL}/chat/completions`,
@@ -282,15 +405,16 @@ class AICodeReviewer {
           messages: [
             {
               role: "system",
-              content: "你是一个专业的代码审查专家。请分析以下代码组，为每个有问题的代码组提供具体的改进建议。如果某个代码组完全没有问题，请回复'PASS'。请用中文回复，简洁明了。",
+              content: "你是代码审查专家。分析代码组，为有问题的组提供改进建议，无问题的回复PASS。用中文，简洁。",
             },
             {
               role: "user",
               content: prompt,
             },
           ],
-          max_tokens: Math.min(this.maxTokens, 800), // 批量评论可以更长
+          max_tokens: Math.min(this.maxTokens, 600), // 减少token使用
           temperature: this.temperature,
+          stream: false, // 关闭流式处理以提高速度
         },
         {
           headers: {
@@ -303,8 +427,8 @@ class AICodeReviewer {
 
       const reviewText = response.data.choices[0].message.content.trim();
       
-      // 解析批量审查结果
-      return this.parseBatchReviewResult(fileName, filteredGroups, reviewText);
+      // 快速解析批量审查结果
+      return this.parseBatchReviewResultFast(fileName, groups, reviewText);
       
     } catch (err) {
       Logger.error('批量审查失败', err);
@@ -313,65 +437,67 @@ class AICodeReviewer {
   }
 
   /**
-   * 创建批量审查提示
+   * 创建优化的提示词
    * @param {string} fileName - 文件名
    * @param {Array} groups - 代码组数组
-   * @returns {string} 提示内容
+   * @returns {string} 优化的提示词
    */
-  createBatchReviewPrompt(fileName, groups) {
-    let prompt = `请审查以下代码组，文件: ${fileName}\n\n`;
+  createOptimizedPrompt(fileName, groups) {
+    let prompt = `审查文件: ${fileName}\n\n`;
     
     groups.forEach((group, index) => {
       const codeContent = group.lines.map(line => line.content).join('\n');
-      prompt += `代码组 ${index + 1} (行 ${group.startLine}-${group.endLine}):\n${codeContent}\n\n`;
+      prompt += `${index + 1}. 行${group.startLine}-${group.endLine}:\n${codeContent}\n\n`;
     });
     
-    prompt += `请为每个代码组提供审查意见，格式如下：
-代码组 1: [审查意见或PASS]
-代码组 2: [审查意见或PASS]
-...
-
-要求：
-- 用中文回复
-- 每个意见不超过100字
-- 如果代码组没有问题，回复PASS
-- 重点关注代码质量、安全性、性能和最佳实践`;
+    prompt += `回复格式：\n1. [意见或PASS]\n2. [意见或PASS]\n...\n\n要求：中文，每意见<80字，无问题回复PASS`;
     
     return prompt;
   }
 
   /**
-   * 解析批量审查结果
+   * 快速解析批量审查结果
    * @param {string} fileName - 文件名
    * @param {Array} groups - 代码组数组
    * @param {string} reviewText - AI 返回的审查文本
    * @returns {Array} 解析后的审查结果
    */
-  parseBatchReviewResult(fileName, groups, reviewText) {
+  parseBatchReviewResultFast(fileName, groups, reviewText) {
     const reviews = [];
     
     try {
-      // 简单的解析逻辑，可以根据实际 AI 输出格式调整
+      // 使用正则表达式快速解析
       const lines = reviewText.split('\n');
+      const reviewPattern = /^(\d+)\.\s*(.+)$/;
       
       for (let i = 0; i < groups.length && i < lines.length; i++) {
         const line = lines[i].trim();
-        const group = groups[i];
+        const match = line.match(reviewPattern);
         
-        if (line && !line.includes('PASS') && line.length > 10) {
-          const lastLine = group.lines[group.lines.length - 1];
-          reviews.push({
-            lineNumber: lastLine.lineNumber,
-            content: lastLine.content,
-            review: line,
-            groupId: group.id,
-            isGroupEnd: true,
-            groupSize: group.lines.length
-          });
+        if (match) {
+          const groupIndex = parseInt(match[1]) - 1;
+          const reviewContent = match[2].trim();
+          
+          if (groupIndex >= 0 && groupIndex < groups.length && 
+              reviewContent && !reviewContent.includes('PASS') && 
+              reviewContent.length > 10) {
+            
+            const group = groups[groupIndex];
+            const lastLine = group.lines[group.lines.length - 1];
+            
+            reviews.push({
+              lineNumber: lastLine.lineNumber,
+              content: lastLine.content,
+              review: reviewContent,
+              groupId: group.id,
+              isGroupEnd: true,
+              groupSize: group.lines.length
+            });
+          }
         }
       }
     } catch (err) {
-      Logger.error('解析批量审查结果失败', err);
+      Logger.error('快速解析批量审查结果失败', err);
     }
     
     return reviews;
