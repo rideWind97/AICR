@@ -99,7 +99,7 @@ class AICodeReviewer {
    * 处理单个文件
    * @param {Object} change - 变更对象
    * @param {Array} existingComments - 已有评论数组
-   * @returns {Promise<Object|null>} 文件审查结果
+   * @returns {Promise<Object|null>} 文件审查结果 - 优化
    */
   async processSingleFile(change, existingComments) {
     try {
