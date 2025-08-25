@@ -5,6 +5,7 @@ require('dotenv').config();
 // 导入模块
 const { getLocalIP } = require('./utils/helpers');
 const webhookRoutes = require('./routes/webhook');
+const modelRoutes = require('./routes/models');
 const Logger = require('./utils/logger');
 
 // ==================== 配置和初始化 ====================
@@ -13,6 +14,17 @@ app.use(express.json());
 
 // ==================== 路由注册 ====================
 app.use('/api', webhookRoutes);
+app.use('/api/models', modelRoutes);
+
+// ==================== 健康检查接口 ====================
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '2.0.0',
+    features: ['multi-model-ai', 'gitlab-integration', 'code-review']
+  });
+});
 
 // ==================== 404 处理 ====================
 app.use('*', (req, res) => {
@@ -49,10 +61,12 @@ const localIP = getLocalIP();
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, localIP, () => {
-  Logger.info('AI CR 服务启动成功', {
+  Logger.info('多模型AI代码审查服务启动成功', {
     port: PORT,
     ip: localIP,
     webhookUrl: `http://${localIP}:${PORT}/api/gitlab/webhook`,
-    healthUrl: `http://${localIP}:${PORT}/api/health`
+    healthUrl: `http://${localIP}:${PORT}/api/health`,
+    modelsUrl: `http://${localIP}:${PORT}/api/models`,
+    version: '2.0.0'
   });
 });

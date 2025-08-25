@@ -9,12 +9,37 @@ module.exports = {
     maxRetries: parseInt(process.env.GITLAB_MAX_RETRIES) || 3
   },
   ai: {
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    apiURL: process.env.DEEPSEEK_API_URL,
-    model: process.env.DEEPSEEK_MODEL || 'deepseek-coder',
-    maxTokens: parseInt(process.env.DEEPSEEK_MAX_TOKENS) || 2000,
-    temperature: parseFloat(process.env.DEEPSEEK_TEMPERATURE) || 0.3,
-    timeout: parseInt(process.env.DEEPSEEK_TIMEOUT) || 3000000
+    // 多模型支持
+    model: process.env.AI_MODEL || 'deepseek-coder',
+    maxTokens: parseInt(process.env.AI_MAX_TOKENS) || 2000,
+    temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.3,
+    timeout: parseInt(process.env.AI_REQUEST_TIMEOUT) || 6000,
+    
+    // 各模型配置
+    openai: {
+      apiKey: process.env.OPENAI_API_KEY,
+      apiURL: process.env.OPENAI_API_URL || 'https://api.openai.com/v1'
+    },
+    claude: {
+      apiKey: process.env.CLAUDE_API_KEY,
+      apiURL: process.env.CLAUDE_API_URL || 'https://api.anthropic.com/v1'
+    },
+    deepseek: {
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      apiURL: process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1',
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-coder',
+      maxTokens: parseInt(process.env.DEEPSEEK_MAX_TOKENS) || 2000,
+      temperature: parseFloat(process.env.DEEPSEEK_TEMPERATURE) || 0.3,
+      timeout: parseInt(process.env.DEEPSEEK_TIMEOUT) || 3000000
+    },
+    qwen: {
+      apiKey: process.env.QWEN_API_KEY,
+      apiURL: process.env.QWEN_API_URL || 'https://dashscope.aliyuncs.com/api/v1'
+    },
+    gemini: {
+      apiKey: process.env.GEMINI_API_KEY,
+      apiURL: process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta'
+    }
   },
   server: {
     port: parseInt(process.env.PORT) || 3001,
