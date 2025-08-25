@@ -8,6 +8,13 @@ module.exports = {
     timeout: parseInt(process.env.GITLAB_TIMEOUT) || 1000000,
     maxRetries: parseInt(process.env.GITLAB_MAX_RETRIES) || 3
   },
+  github: {
+    token: process.env.GITHUB_TOKEN,
+    apiURL: process.env.GITHUB_API_URL || 'https://api.github.com',
+    timeout: parseInt(process.env.GITHUB_TIMEOUT) || 10000,
+    maxRetries: parseInt(process.env.GITHUB_MAX_RETRIES) || 3,
+    webhookSecret: process.env.GITHUB_WEBHOOK_SECRET
+  },
   ai: {
     // 多模型支持
     model: process.env.AI_MODEL || 'deepseek-coder',

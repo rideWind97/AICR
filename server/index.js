@@ -5,6 +5,7 @@ require('dotenv').config();
 // 导入模块
 const { getLocalIP } = require('./utils/helpers');
 const webhookRoutes = require('./routes/webhook');
+const githubRoutes = require('./routes/github');
 const modelRoutes = require('./routes/models');
 const Logger = require('./utils/logger');
 
@@ -14,6 +15,7 @@ app.use(express.json());
 
 // ==================== 路由注册 ====================
 app.use('/api', webhookRoutes);
+app.use('/api/github', githubRoutes);
 app.use('/api/models', modelRoutes);
 
 // ==================== 健康检查接口 ====================
@@ -22,7 +24,7 @@ app.get('/api/health', (req, res) => {
     status: 'healthy',
     timestamp: new Date().toISOString(),
     version: '2.0.0',
-    features: ['multi-model-ai', 'gitlab-integration', 'code-review']
+    features: ['multi-model-ai', 'gitlab-integration', 'github-integration', 'code-review']
   });
 });
 
@@ -65,6 +67,7 @@ app.listen(PORT, localIP, () => {
     port: PORT,
     ip: localIP,
     webhookUrl: `http://${localIP}:${PORT}/api/gitlab/webhook`,
+    githubWebhookUrl: `http://${localIP}:${PORT}/api/github/webhook`,
     healthUrl: `http://${localIP}:${PORT}/api/health`,
     modelsUrl: `http://${localIP}:${PORT}/api/models`,
     version: '2.0.0'
