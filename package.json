@@ -1,0 +1,38 @@
+{
+  "name": "mg-ai-code-reviewer",
+  "version": "1.0.0",
+  "description": "AI-powered code reviewer for GitLab using DeepSeek",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "nodemon server/index.js",
+    "start": "node server/launcher.js",
+    "start:direct": "node server/index.js",
+    "start:managed": "node server/launcher.js",
+    "monitor": "node scripts/monitor.js",
+    "monitor:health": "node scripts/monitor.js health",
+    "monitor:tasks": "node scripts/monitor.js tasks",
+    "monitor:restart": "node scripts/monitor.js restart",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "echo \"Linting not configured\" && exit 1",
+    "format": "echo \"Formatting not configured\" && exit 1"
+  },
+  "keywords": [
+    "gitlab",
+    "ai",
+    "code-review",
+    "deepseek"
+  ],
+  "author": "shengjunpeng",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
