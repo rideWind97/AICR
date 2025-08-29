@@ -5,13 +5,8 @@
   "main": "server/index.js",
   "scripts": {
     "dev": "nodemon server/index.js",
-    "start": "node server/launcher.js",
-    "start:direct": "node server/index.js",
-    "start:managed": "node server/launcher.js",
+    "start": "node server/index.js",
     "monitor": "node scripts/monitor.js",
-    "monitor:health": "node scripts/monitor.js health",
-    "monitor:tasks": "node scripts/monitor.js tasks",
-    "monitor:restart": "node scripts/monitor.js restart",
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "echo \"Linting not configured\" && exit 1",
     "format": "echo \"Formatting not configured\" && exit 1"

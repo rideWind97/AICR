@@ -124,9 +124,9 @@ GITLAB_MAX_RETRIES=3
 AI_API_KEY=your_AI_API_KEY
 AI_API_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 AI_MODEL=qwen-plus
-DEEPSEEK_MAX_TOKENS=2000
-DEEPSEEK_TEMPERATURE=0.3
-DEEPSEEK_TIMEOUT=30000
+AI_MAX_TOKENS=2000
+AI_TEMPERATURE=0.3
+AI_TIMEOUT=30000
 
 # 服务器配置
 PORT=3001
@@ -225,7 +225,7 @@ node test-webhook.js
 | -------------------- | ------------------- | ------- |
 | `GITLAB_TIMEOUT`     | GitLab API 超时时间 | 10000ms |
 | `GITLAB_MAX_RETRIES` | GitLab API 重试次数 | 3       |
-| `DEEPSEEK_TIMEOUT`   | AI API 超时时间     | 30000ms |
+| `AI_TIMEOUT`   | AI API 超时时间     | 30000ms |
 
 ### 日志配置
 
@@ -273,7 +273,7 @@ curl http://your-server:3001/api/health
    - 检查网络连接和防火墙
 3. **AI 服务超时**
 
-   - 增加 `DEEPSEEK_TIMEOUT` 值
+   - 增加 `AI_TIMEOUT` 值
    - 检查 DeepSeek API 状态
 4. **Webhook 接收失败**
 

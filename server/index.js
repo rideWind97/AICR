@@ -24,8 +24,7 @@ app.use('*', (req, res) => {
   
   res.status(404).json({ 
     error: 'Not Found',
-    message: `路径 ${req.originalUrl} 不存在`,
-    timestamp: new Date().toISOString()
+    message: `路径 ${req.originalUrl} 不存在`
   });
 });
 
@@ -39,45 +38,19 @@ app.use((err, req, res, next) => {
   
   res.status(500).json({ 
     error: 'Internal Server Error',
-    message: err.message,
-    timestamp: new Date().toISOString()
+    message: err.message
   });
 });
 
-// ==================== 进程间通信处理 ====================
-if (process.send) {
-  // 处理来自父进程的消息
-  process.on('message', (message) => {
-    if (message.type === 'health_check') {
-      // 发送健康状态回父进程
-      process.send({
-        type: 'health',
-        status: 'healthy',
-        timestamp: Date.now(),
-        pid: process.pid
-      });
-    }
-  });
-
-  // 通知父进程服务已启动
-  process.send({
-    type: 'service_started',
-    status: 'ready',
-    timestamp: Date.now(),
-    pid: process.pid
-  });
-}
-
 // ==================== 服务启动 ====================
-const localIP = getLocalIP();
 const PORT = process.env.PORT || 3001;
+const localIP = getLocalIP();
 
 const server = app.listen(PORT, localIP, () => {
   Logger.info('AI CR 服务启动成功', {
     port: PORT,
     ip: localIP,
-    webhookUrl: `http://${localIP}:${PORT}/api/gitlab/webhook`,
-    healthUrl: `http://${localIP}:${PORT}/api/health`
+    webhookUrl: `http://${localIP}:${PORT}/api/gitlab/webhook`
   });
 });
 

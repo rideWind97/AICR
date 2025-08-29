@@ -13,64 +13,6 @@ class EventHandler {
   }
 
   /**
-   * 处理 push 事件 - 异步版本
-   * @param {Object} event - push 事件数据
-   * @returns {Promise<Object>} 处理结果
-   */
-  async handlePushEvent(event) {
-    const startTime = Logger.startTimer('Push事件处理');
-    
-    try {
-      const projectId = event.project?.id;
-      const commitId = event.after;
-      const branch = event.ref?.replace('refs/heads/', '');
-
-      if (!projectId || !commitId || !branch) {
-        Logger.error('缺少必要的事件信息', null, { projectId, commitId, branch });
-        throw new Error('Missing project ID, commit ID or branch');
-      }
-
-      Logger.info('开始处理Push事件', { projectId, branch, commitId });
-
-      // 查找关联的 MR
-      const mr = await this.gitlabAPI.findMergeRequestByBranch(projectId, branch);
-      if (!mr) {
-        Logger.warn('Push事件未找到关联MR', { projectId, branch, commitId });
-        return { message: 'No associated MR found' };
-      }
-
-      // 异步启动代码审查任务
-      this.startCodeReviewTask('push', {
-        projectId,
-        mrIid: mr.iid,
-        commitId,
-        branch,
-        eventType: 'push'
-      });
-
-      Logger.endTimer('Push事件处理', startTime, {
-        projectId,
-        mrIid: mr.iid,
-        commitId,
-        status: 'async_started'
-      });
-
-      return {
-        success: true,
-        message: 'Code review task started asynchronously',
-        project_id: projectId,
-        mr_iid: mr.iid,
-        commit_id: commitId,
-        status: 'processing'
-      };
-
-    } catch (err) {
-      Logger.error('Push事件处理失败', err);
-      throw err;
-    }
-  }
-
-  /**
    * 处理 merge_request 事件 - 异步版本
    * @param {Object} event - merge_request 事件数据
    * @returns {Promise<Object>} 处理结果

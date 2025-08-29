@@ -1,5 +1,6 @@
 const express = require('express');
 const EventHandler = require('../handlers/eventHandler');
+const GitHubEventHandler = require('../handlers/githubEventHandler');
 const Logger = require('../utils/logger');
 
 const router = express.Router();
@@ -12,7 +13,8 @@ router.get('/health', (req, res) => {
     status: 'OK', 
     timestamp: new Date().toISOString(),
     service: 'MG AI Code Reviewer',
-    version: '1.0.0'
+    version: '1.0.0',
+    supported_platforms: ['GitLab', 'GitHub']
   });
 });
 
@@ -22,13 +24,20 @@ router.get('/health', (req, res) => {
 router.get('/tasks', (req, res) => {
   try {
     const eventHandler = new EventHandler();
-    const tasks = eventHandler.getAllTaskStatus();
+    const githubEventHandler = new GitHubEventHandler();
+    
+    const gitlabTasks = eventHandler.getAllTaskStatus();
+    const githubTasks = githubEventHandler.getAllTaskStatus();
+    
+    const allTasks = [...gitlabTasks, ...githubTasks];
     
     res.json({
       success: true,
       data: {
-        total: tasks.length,
-        tasks: tasks
+        total: allTasks.length,
+        gitlab_tasks: gitlabTasks.length,
+        github_tasks: githubTasks.length,
+        tasks: allTasks
       }
     });
   } catch (err) {
@@ -47,7 +56,12 @@ router.get('/tasks/:taskId', (req, res) => {
   try {
     const { taskId } = req.params;
     const eventHandler = new EventHandler();
-    const task = eventHandler.getTaskStatus(taskId);
+    const githubEventHandler = new GitHubEventHandler();
+    
+    let task = eventHandler.getTaskStatus(taskId);
+    if (!task) {
+      task = githubEventHandler.getTaskStatus(taskId);
+    }
     
     if (!task) {
       return res.status(404).json({ 
@@ -103,83 +117,107 @@ router.post('/gitlab/webhook', async (req, res) => {
   
   try {
     const event = req.body;
+    const eventType = event.object_kind;
     
-    Logger.info('收到GitLab webhook请求', {
-      objectKind: event.object_kind,
-      action: event.object_attributes?.action,
+    Logger.info('收到GitLab webhook事件', { 
+      eventType,
       projectId: event.project?.id,
-      mrIid: event.object_attributes?.iid
+      userId: event.user?.id
     });
-    
-    // 检查环境变量
-    if (!process.env.GITLAB_URL || !process.env.AI_API_KEY) {
-      Logger.error('缺少必要的环境变量', null, { 
-        hasGitlabUrl: !!process.env.GITLAB_URL,
-        hasDeepseekKey: !!process.env.AI_API_KEY 
-      });
-      return res.status(500).json({ error: 'Missing environment variables' });
-    }
 
     // 验证事件类型
-    if (event.object_kind !== 'merge_request') {
-      Logger.warn('忽略不支持的事件类型', null, { objectKind: event.object_kind });
-      return res.status(200).json({ message: 'Ignored - not a merge request' });
-    }
-
-    const action = event.object_attributes?.action;
-    
-    // 优化1: MR关闭时不需要处理
-    if (action === 'close') {
-      Logger.info('MR已关闭，跳过处理', { 
-        projectId: event.project?.id, 
-        mrIid: event.object_attributes?.iid,
-        action 
+    if (!['push', 'merge_request'].includes(eventType)) {
+      Logger.warn('不支持的事件类型', null, { eventType });
+      return res.status(200).json({ 
+        message: 'Event type not supported',
+        eventType 
       });
-      return res.status(200).json({ message: 'MR closed - no processing needed' });
-    }
-    
-    if (!['open', 'reopen', 'update'].includes(action)) {
-      Logger.warn('忽略不支持的操作', null, { action });
-      return res.status(200).json({ message: 'Not interested - action not supported' });
     }
 
-    const projectId = event.project?.id;
-    const mrIid = event.object_attributes?.iid;
-
-    if (!projectId || !mrIid) {
-      Logger.error('缺少必要的事件参数', null, { projectId, mrIid });
-      return res.status(400).json({ error: 'Missing project ID or MR IID' });
-    }
-
-    // 处理事件 - 异步启动代码审查任务
     const eventHandler = new EventHandler();
-    const result = await eventHandler.handleMergeRequestEvent(event);
-    
+    let result;
+
+    if (eventType === 'push') {
+      result = await eventHandler.handlePushEvent(event);
+    } else if (eventType === 'merge_request') {
+      result = await eventHandler.handleMergeRequestEvent(event);
+    }
+
     Logger.endTimer('Webhook处理', startTime, {
-      projectId,
-      mrIid,
-      action,
-      success: result.success,
-      status: 'async_started'
+      eventType,
+      result: result?.message || 'Unknown'
     });
-    
-    // 快速响应，不等待代码审查完成
+
     res.status(200).json({
-      ...result,
-      note: 'Code review task started asynchronously. Use /api/tasks to check status.',
-      webhook_response_time: Date.now() - startTime
+      success: true,
+      message: 'Webhook processed successfully',
+      eventType,
+      result
     });
 
   } catch (err) {
-    Logger.error('Webhook处理失败', err);
-    if (err.response) {
-      Logger.error('API响应错误', null, {
-        status: err.response.status,
-        data: err.response.data
-      });
-    }
+    Logger.error('GitLab webhook处理失败', err);
+    Logger.endTimer('Webhook处理', startTime, { error: err.message });
+    
     res.status(500).json({ 
       error: 'Webhook processing failed',
+      message: err.message
+    });
+  }
+});
+
+/**
+ * GitHub Webhook 入口
+ */
+router.post('/github/webhook', async (req, res) => {
+  const startTime = Logger.startTimer('GitHub Webhook处理');
+  
+  try {
+    const event = req.body;
+    const eventType = req.headers['x-github-event'];
+    
+    Logger.info('收到GitHub webhook事件', { 
+      eventType,
+      repository: event.repository?.full_name,
+      sender: event.sender?.login
+    });
+
+    // 验证事件类型
+    if (!['push', 'pull_request'].includes(eventType)) {
+      Logger.warn('不支持的GitHub事件类型', null, { eventType });
+      return res.status(200).json({ 
+        message: 'Event type not supported',
+        eventType 
+      });
+    }
+
+    const githubEventHandler = new GitHubEventHandler();
+    let result;
+
+    if (eventType === 'push') {
+      result = await githubEventHandler.handlePushEvent(event);
+    } else if (eventType === 'pull_request') {
+      result = await githubEventHandler.handlePullRequestEvent(event);
+    }
+
+    Logger.endTimer('GitHub Webhook处理', startTime, {
+      eventType,
+      result: result?.message || 'Unknown'
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'GitHub webhook processed successfully',
+      eventType,
+      result
+    });
+
+  } catch (err) {
+    Logger.error('GitHub webhook处理失败', err);
+    Logger.endTimer('GitHub Webhook处理', startTime, { error: err.message });
+    
+    res.status(500).json({ 
+      error: 'GitHub webhook processing failed',
       message: err.message
     });
   }

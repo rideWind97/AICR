@@ -7,6 +7,7 @@ const WEBHOOK_PATH = "/api/gitlab/webhook";
 
 // 模拟 GitLab webhook 数据
 const webhookData = {
+  a: 2,
   changes: {
     author_id: { current: 796, previous: null },
     created_at: { current: "2025-08-28 17:56:52 +0800", previous: null },
