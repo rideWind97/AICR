@@ -2,10 +2,6 @@
 
 一个基于 AI 的 GitLab 代码审查工具，能够自动分析代码变更并生成智能审查意见。
 
-## 🎥 演示视频
-
-观看 [demo.mp4](./20250824-155251.mp4) 了解 AICR 的实际运行效果。
-
 ## 🚀 功能特性
 
 - **智能代码审查**：使用 DeepSeek AI 自动分析代码质量和潜在问题
@@ -161,9 +157,8 @@ npm start
 
 在 GitLab 项目中添加 Webhook：
 
-- **URL**: `http://your-server:3001/api/gitlab/webhook`
+- **URL**: `https://cr.mastergo.com/api/gitlab/webhook`
 - **触发事件**:
-  - `Push events`
   - `Merge request events`
 - **SSL 验证**: 根据环境选择
 
@@ -171,7 +166,7 @@ npm start
 
 配置完成后，系统会自动：
 
-1. 监听 GitLab 的 push 和 merge_request 事件
+1. 监听 GitLab 的 merge_request 事件
 2. 分析代码变更内容
 3. 使用 AI 生成代码审查意见
 4. 在 MR 的具体代码行下添加评论
@@ -225,7 +220,7 @@ node test-webhook.js
 | -------------------- | ------------------- | ------- |
 | `GITLAB_TIMEOUT`     | GitLab API 超时时间 | 10000ms |
 | `GITLAB_MAX_RETRIES` | GitLab API 重试次数 | 3       |
-| `AI_TIMEOUT`   | AI API 超时时间     | 30000ms |
+| `AI_TIMEOUT`         | AI API 超时时间     | 30000ms |
 
 ### 日志配置
 
@@ -240,7 +235,7 @@ node test-webhook.js
 ### 健康检查
 
 ```bash
-curl http://your-server:3001/api/health
+curl https://cr.mastergo.com/api/health
 ```
 
 ### 日志级别
@@ -274,7 +269,7 @@ curl http://your-server:3001/api/health
 3. **AI 服务超时**
 
    - 增加 `AI_TIMEOUT` 值
-   - 检查 DeepSeek API 状态
+   - 检查 API 状态
 4. **Webhook 接收失败**
 
    - 确认服务器端口开放

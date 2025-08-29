@@ -23,6 +23,36 @@ class AICodeReviewer {
     this.reviewCache = new Map();
     this.cacheExpiry = 24 * 60 * 60 * 1000; // 24小时过期
     
+    // 文件类型过滤规则
+    this.fileTypeRules = {
+      // 完全跳过的文件类型
+      ignoredExtensions: [
+        // 样式文件
+        '.css', '.scss', '.sass', '.less', '.styl',
+        // 文档文件
+        '.md', '.markdown', '.mdx', '.txt', '.rst', '.adoc', '.doc', '.docx', '.pdf',
+        // 配置文件
+        '.yml', '.yaml', '.toml', '.ini', '.conf', '.cfg', '.config'
+      ],
+      
+      // 特殊处理的文件类型（优先级高于ignoredExtensions）
+      specialHandling: {
+        // package.json相关文件 - 跳过版本校验
+        packageFiles: {
+          enabled: true,
+          patterns: ['package.json', 'package-lock.json'],
+          action: 'skip'
+        },
+        
+        // lock文件 - 只校验语法
+        lockFiles: {
+          enabled: true,
+          patterns: ['pnpm-lock.yaml', 'yarn.lock'],
+          action: 'syntaxOnly'
+        }
+      }
+    };
+    
     // 预过滤规则
     this.skipPatterns = [
       /^\s*\/\/\s*TODO:/i,
@@ -71,7 +101,7 @@ class AICodeReviewer {
       
       // 预处理：过滤需要审查的变更
       const significantChanges = changes.filter(change => 
-        this.isSignificantChange(change.diff)
+        this.isSignificantChange(change.diff, change.new_path || change.old_path)
       );
       
       if (significantChanges.length === 0) {
@@ -577,9 +607,35 @@ class AICodeReviewer {
   /**
    * 判断变更是否重要，需要审查
    * @param {string} diff - diff 内容
+   * @param {string} fileName - 文件名
    * @returns {boolean} 是否需要审查
    */
-  isSignificantChange(diff) {
+  isSignificantChange(diff, fileName) {
+    // 文件类型过滤规则
+    if (fileName) {
+      // 缓存文件名的小写版本，避免重复调用
+      const fileNameLower = fileName.toLowerCase();
+      
+      // 1. 优先检查特殊处理文件类型（优先级高于ignoredExtensions）
+      for (const [type, config] of Object.entries(this.fileTypeRules.specialHandling)) {
+        if (config.enabled && this.matchesPatterns(fileNameLower, config.patterns)) {
+          if (config.action === 'skip') {
+            Logger.info(`跳过文件审查 (${type}): ${fileName}`);
+            return false;
+          } else if (config.action === 'syntaxOnly') {
+            Logger.info(`文件只进行语法校验 (${type}): ${fileName}`);
+            return this.hasSyntaxIssues(diff);
+          }
+        }
+      }
+      
+      // 2. 检查是否在完全跳过的扩展名列表中
+      if (this.matchesExtensions(fileNameLower, this.fileTypeRules.ignoredExtensions)) {
+        Logger.info(`跳过文件审查 (忽略扩展名): ${fileName}`);
+        return false;
+      }
+    }
+    
     const lines = diff.split('\n');
     let addedLineCount = 0;
     
@@ -590,26 +646,166 @@ class AICodeReviewer {
       }
     }
     
+    // 检查是否为纯格式变动
+    if (this.isFormatOnlyChange(diff)) {
+      Logger.info('跳过纯格式变动审查');
+      return false;
+    }
+    
     // 所有新增代码都需要审查，不再限制行数
     // 即使只有 1 行新增，也可能包含重要的逻辑变更
     
     // 检查是否包含重要的代码结构变更
-    const hasStructureChange = diff.includes('function ') || 
-                              diff.includes('class ') || 
-                              diff.includes('import ') || 
-                              diff.includes('export ') ||
-                              diff.includes('if (') ||
-                              diff.includes('for (') ||
-                              diff.includes('while (') ||
-                              diff.includes('return ') ||
-                              diff.includes('throw ') ||
-                              diff.includes('console.') ||
-                              diff.includes('debugger') ||
-                              diff.includes('TODO') ||
-                              diff.includes('FIXME');
+    const hasStructureChange = this.hasCodeStructure(diff);
     
     // 只要有新增代码就进行审查
     return addedLineCount > 0;
+  }
+
+  /**
+   * 检查文件名是否匹配指定的模式
+   * @param {string} fileNameLower - 小写的文件名
+   * @param {Array} patterns - 模式数组
+   * @returns {boolean} 是否匹配
+   */
+  matchesPatterns(fileNameLower, patterns) {
+    return patterns.some(pattern => fileNameLower.includes(pattern.toLowerCase()));
+  }
+
+  /**
+   * 检查文件名是否以指定的扩展名结尾
+   * @param {string} fileNameLower - 小写的文件名
+   * @param {Array} extensions - 扩展名数组
+   * @returns {boolean} 是否匹配
+   */
+  matchesExtensions(fileNameLower, extensions) {
+    return extensions.some(ext => fileNameLower.endsWith(ext));
+  }
+
+  /**
+   * 检查diff是否包含重要的代码结构
+   * @param {string} diff - diff内容
+   * @returns {boolean} 是否包含代码结构
+   */
+  hasCodeStructure(diff) {
+    const codePatterns = [
+      'function ', 'class ', 'import ', 'export ',
+      'if (', 'for (', 'while (', 'return ', 'throw ',
+      'console.', 'debugger', 'TODO', 'FIXME'
+    ];
+    
+    return codePatterns.some(pattern => diff.includes(pattern));
+  }
+
+  /**
+   * 检查lock文件是否有语法问题
+   * @param {string} diff - diff 内容
+   * @returns {boolean} 是否有语法问题
+   */
+  hasSyntaxIssues(diff) {
+    const lines = diff.split('\n');
+    let addedLineCount = 0;
+    
+    for (const line of lines) {
+      // 只统计新增的行
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        addedLineCount++;
+        
+        // 检查是否有明显的语法错误
+        const content = line.substring(1).trim();
+        
+        // 检查YAML语法问题
+        if (content.includes('  ') && content.includes(':') && !content.includes('"')) {
+          // 检查缩进和冒号格式
+          if (content.match(/^\s*[^:]+:\s*$/)) {
+            // 有效的YAML键值对格式
+            continue;
+          }
+        }
+        
+        // 检查是否有明显的格式错误
+        if (content.includes('{{') || content.includes('}}') || 
+            content.includes('<<') || content.includes('>>')) {
+          Logger.warn('发现可能的YAML语法问题', { content });
+          return true;
+        }
+      }
+    }
+    
+    // 如果没有新增内容，不需要审查
+    if (addedLineCount === 0) {
+      return false;
+    }
+    
+    // 对于lock文件，只检查基本的语法问题，不进行深度审查
+    return false;
+  }
+
+  /**
+   * 检查是否为纯格式变动
+   * @param {string} diff - diff 内容
+   * @returns {boolean} 是否为纯格式变动
+   */
+  isFormatOnlyChange(diff) {
+    const lines = diff.split('\n');
+    let addedLines = [];
+    let removedLines = [];
+    
+    for (const line of lines) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        addedLines.push(line.substring(1).trim());
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        removedLines.push(line.substring(1).trim());
+      }
+    }
+    
+    // 如果没有变更，返回false
+    if (addedLines.length === 0 && removedLines.length === 0) {
+      return false;
+    }
+    
+    // 检查是否为纯格式变动（如缩进、空格、换行等）
+    for (let i = 0; i < Math.min(addedLines.length, removedLines.length); i++) {
+      const added = addedLines[i];
+      const removed = removedLines[i];
+      
+      // 去除所有空白字符后比较
+      const addedNormalized = added.replace(/\s+/g, '');
+      const removedNormalized = removed.replace(/\s+/g, '');
+      
+      // 如果去除空白字符后内容相同，说明只是格式变动
+      if (addedNormalized === removedNormalized && addedNormalized !== '') {
+        Logger.info('检测到纯格式变动', { 
+          original: removed, 
+          formatted: added,
+          normalized: addedNormalized 
+        });
+        return true;
+      }
+    }
+    
+    // 检查是否只是空白字符的变动
+    const hasOnlyWhitespaceChanges = addedLines.every(line => /^\s*$/.test(line)) &&
+                                   removedLines.every(line => /^\s*$/.test(line));
+    
+    if (hasOnlyWhitespaceChanges) {
+      Logger.info('检测到纯空白字符变动');
+      return true;
+    }
+    
+    // 检查是否只是注释格式的变动
+    const hasOnlyCommentFormatChanges = addedLines.every(line => 
+      line.startsWith('//') || line.startsWith('/*') || line.startsWith('*') || line.startsWith('*/')
+    ) && removedLines.every(line => 
+      line.startsWith('//') || line.startsWith('/*') || line.startsWith('*') || line.startsWith('*/')
+    );
+    
+    if (hasOnlyCommentFormatChanges) {
+      Logger.info('检测到纯注释格式变动');
+      return true;
+    }
+    
+    return false;
   }
 
   /**
