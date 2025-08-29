@@ -1,5 +1,4 @@
 const axios = require('axios');
-const { createReviewPrompt } = require('../utils/helpers');
 const Logger = require('../utils/logger');
 
 /**
@@ -10,8 +9,8 @@ class AICodeReviewer {
     this.apiKey = process.env.AI_API_KEY;
     this.apiURL = process.env.AI_API_URL;
     this.model = process.env.AI_MODEL || 'qwen-plus';
-    this.maxTokens = parseInt(process.env.DEEPSEEK_MAX_TOKENS) || 2000;
-    this.temperature = parseFloat(process.env.DEEPSEEK_TEMPERATURE) || 0.3;
+    this.maxTokens = parseInt(process.env.AI_MAX_TOKENS) || 2000;
+    this.temperature = parseFloat(process.env.AI_TEMPERATURE) || 0.3;
     
     // 性能优化配置
     this.maxConcurrentFiles = parseInt(process.env.MAX_FILES_CONCURRENT) || 5;
