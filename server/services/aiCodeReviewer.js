@@ -49,6 +49,13 @@ class AICodeReviewer {
           enabled: true,
           patterns: ['pnpm-lock.yaml', 'yarn.lock'],
           action: 'syntaxOnly'
+        },
+        
+        // Vue文件 - 跳过style部分
+        vueFiles: {
+          enabled: true,
+          patterns: ['.vue'],
+          action: 'skipStyle'
         }
       }
     };
@@ -434,7 +441,7 @@ class AICodeReviewer {
           messages: [
             {
               role: "system",
-              content: "你是代码审查专家。分析代码组，为有问题的组提供改进建议，无问题的回复PASS。用中文，简洁。",
+              content: "你是代码审查专家。分析代码组，只为有问题的组提供具体的改进建议。如果代码完全没有问题，请直接回复'PASS'，不要生成任何评论。用中文，简洁。",
             },
             {
               role: "user",
@@ -479,7 +486,7 @@ class AICodeReviewer {
       prompt += `${index + 1}. 行${group.startLine}-${group.endLine}:\n${codeContent}\n\n`;
     });
     
-    prompt += `回复格式：\n1. [意见或PASS]\n2. [意见或PASS]\n...\n\n要求：中文，每意见<80字，无问题回复PASS`;
+    prompt += `回复格式：\n1. [具体改进建议或PASS]\n2. [具体改进建议或PASS]\n...\n\n要求：中文，每意见<80字，无问题直接回复PASS，不要生成"无问题"、"代码很好"等无意义的评论`;
     
     return prompt;
   }
@@ -509,7 +516,8 @@ class AICodeReviewer {
           
           if (groupIndex >= 0 && groupIndex < groups.length && 
               reviewContent && !reviewContent.includes('PASS') && 
-              reviewContent.length > 10) {
+              reviewContent.length > 10 && 
+              !this.isLowQualityReview(reviewContent)) {
             
             const group = groups[groupIndex];
             const lastLine = group.lines[group.lines.length - 1];
@@ -625,6 +633,9 @@ class AICodeReviewer {
           } else if (config.action === 'syntaxOnly') {
             Logger.info(`文件只进行语法校验 (${type}): ${fileName}`);
             return this.hasSyntaxIssues(diff);
+          } else if (config.action === 'skipStyle') {
+            Logger.info(`Vue文件跳过style部分审查: ${fileName}`);
+            return this.shouldReviewVueFile(diff);
           }
         }
       }
@@ -739,6 +750,96 @@ class AICodeReviewer {
     
     // 对于lock文件，只检查基本的语法问题，不进行深度审查
     return false;
+  }
+
+  /**
+   * 检查Vue文件是否需要审查（跳过style部分）
+   * @param {string} diff - diff内容
+   * @returns {boolean} 是否需要审查
+   */
+  shouldReviewVueFile(diff) {
+    const lines = diff.split('\n');
+    let addedLineCount = 0;
+    let inStyleSection = false;
+    
+    for (const line of lines) {
+      const content = line.substring(1).trim(); // 去掉+号
+      
+      // 检查是否进入style部分
+      if (content.includes('<style') || content.includes('<style>')) {
+        inStyleSection = true;
+        continue;
+      }
+      
+      // 检查是否离开style部分
+      if (content.includes('</style>')) {
+        inStyleSection = false;
+        continue;
+      }
+      
+      // 如果在style部分内，跳过审查
+      if (inStyleSection) {
+        continue;
+      }
+      
+      // 只统计新增的行（不在style部分内）
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        addedLineCount++;
+      }
+    }
+    
+    // 如果没有新增内容，不需要审查
+    if (addedLineCount === 0) {
+      Logger.info('Vue文件没有新增内容，跳过审查');
+      return false;
+    }
+    
+    // 检查是否只包含style部分的变更
+    const hasOnlyStyleChanges = this.hasOnlyStyleChanges(diff);
+    if (hasOnlyStyleChanges) {
+      Logger.info('Vue文件只包含style部分变更，跳过审查');
+      return false;
+    }
+    
+    Logger.info(`Vue文件包含非style部分变更，需要审查，新增行数: ${addedLineCount}`);
+    return true;
+  }
+
+  /**
+   * 检查是否只包含style部分的变更
+   * @param {string} diff - diff内容
+   * @returns {boolean} 是否只包含style变更
+   */
+  hasOnlyStyleChanges(diff) {
+    const lines = diff.split('\n');
+    let hasStyleChanges = false;
+    let hasNonStyleChanges = false;
+    let inStyleSection = false;
+    
+    for (const line of lines) {
+      const content = line.substring(1).trim();
+      
+      // 检查style标签
+      if (content.includes('<style') || content.includes('</style>')) {
+        inStyleSection = !inStyleSection; // 切换状态
+        continue;
+      }
+      
+      // 如果在style部分内
+      if (inStyleSection) {
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+          hasStyleChanges = true;
+        }
+      } else {
+        // 不在style部分内
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+          hasNonStyleChanges = true;
+        }
+      }
+    }
+    
+    // 只有style变更，没有其他变更
+    return hasStyleChanges && !hasNonStyleChanges;
   }
 
   /**
@@ -871,9 +972,61 @@ class AICodeReviewer {
       '代码没问题'
     ];
     
-    return lowQualityPatterns.some(pattern => 
-      review.toLowerCase().includes(pattern.toLowerCase())
-    );
+    // 检查是否包含低质量模式
+    if (lowQualityPatterns.some(pattern => 
+      review.toLowerCase().includes(pattern.toLowerCase()))) {
+      return true;
+    }
+    
+    // 检查是否为"无意义的多言"评论
+    const verbosePatterns = [
+      '新增代码逻辑清晰',
+      '结构合理',
+      '符合.*规范',
+      '不存在明显.*问题',
+      '使用合理',
+      '整体设计',
+      '简洁有效',
+      '代码质量良好',
+      '实现方式正确',
+      '遵循最佳实践',
+      '没有发现.*问题',
+      '代码结构清晰',
+      '逻辑清晰',
+      '设计合理',
+      '实现合理',
+      '符合.*标准',
+      '没有.*问题',
+      '代码.*良好',
+      '整体.*合理',
+      '结构.*清晰'
+    ];
+    
+    // 检查是否匹配冗长模式
+    for (const pattern of verbosePatterns) {
+      const regex = new RegExp(pattern, 'i');
+      if (regex.test(review)) {
+        return true;
+      }
+    }
+    
+    // 检查评论长度和内容质量
+    const reviewLower = review.toLowerCase();
+    
+    // 如果评论过长且包含大量空泛词汇，认为是低质量
+    if (review.length > 100) {
+      const emptyWords = [
+        '逻辑', '结构', '规范', '问题', '合理', '清晰', '良好', '正确', '标准', '实践',
+        '设计', '实现', '方式', '质量', '整体', '简洁', '有效', '符合', '遵循', '没有'
+      ];
+      
+      const emptyWordCount = emptyWords.filter(word => reviewLower.includes(word)).length;
+      if (emptyWordCount >= 5) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   /**
@@ -1037,7 +1190,7 @@ class AICodeReviewer {
             {
               role: "system",
               content:
-                "你是一个专业的代码审查专家。请仔细分析代码，如果发现任何问题或改进点，请提供具体的建议。如果代码完全没有问题，请直接回复'PASS'（不要解释为什么没问题）。",
+                "你是一个专业的代码审查专家。请仔细分析代码，如果发现任何问题或改进点，请提供具体的建议。如果代码完全没有问题，请直接回复'PASS'，不要生成任何评论或解释。",
             },
             {
               role: "user",
@@ -1117,7 +1270,7 @@ ${codeContent}
 - 用中文回复
 - 简洁明了，不超过 150 字
 - 重点关注新增代码的逻辑和设计
-- 不要生成"无问题"、"代码很好"等无意义的评论
+- 无问题时不生成任何评论，直接回复PASS
 `;
   }
 
