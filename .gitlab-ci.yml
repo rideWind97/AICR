@@ -1,0 +1,21 @@
+image: ${HARBOR_HOST}/master-tools/basenpm:v20.15.1
+
+stages:
+  - build
+
+variables:
+  projectName: "frontend-ai-cr"
+  imageVersion: ${CI_COMMIT_SHORT_SHA}
+
+build:
+  stage: build
+  tags:
+    - k8s-runner-mastergo
+  script:
+  - npm install
+  - docker login -u $HARBOR_USERNAME -p $HARBOR_PASSWORD $HARBOR_HOST
+  - docker build -t ${HARBOR_HOST}/master-tools/${projectName}:${imageVersion} .
+  - docker push ${HARBOR_HOST}/master-tools/${projectName}:${imageVersion}
+  only:
+    refs:
+      - master
