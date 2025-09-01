@@ -479,14 +479,38 @@ class AICodeReviewer {
    * @returns {string} 优化的提示词
    */
   createOptimizedPrompt(fileName, groups) {
-    let prompt = `审查文件: ${fileName}\n\n`;
+    let prompt = `🔍 AI代码审查 - 文件: ${fileName}\n\n`;
     
     groups.forEach((group, index) => {
       const codeContent = group.lines.map(line => line.content).join('\n');
       prompt += `${index + 1}. 行${group.startLine}-${group.endLine}:\n${codeContent}\n\n`;
     });
     
-    prompt += `回复格式：\n1. [具体改进建议或PASS]\n2. [具体改进建议或PASS]\n...\n\n要求：中文，每意见<80字，无问题直接回复PASS，不要生成"无问题"、"代码很好"等无意义的评论`;
+    prompt += `请按照以下规则进行专业代码审查:\n\n`;
+    prompt += `**一、基本代码质量规则（AI 可自动检测）**\n`;
+    prompt += `1. 命名规范：变量、函数、类名应具有描述性，避免缩写或模糊命名\n`;
+    prompt += `2. 函数职责单一：一个函数只做一件事，避免超过50行代码\n`;
+    prompt += `3. 避免重复代码（DRY）：识别相似代码块，提示提取为公共函数\n`;
+    prompt += `4. 注释与文档：公共函数/类必须有注释说明功能、参数、返回值\n`;
+    prompt += `5. 错误处理：所有可能出错的操作必须有异常处理\n\n`;
+    
+    prompt += `**二、安全相关规则（AI 可重点扫描）**\n`;
+    prompt += `1. 输入验证：所有外部输入必须验证和清理，防止注入攻击\n`;
+    prompt += `2. 敏感信息：禁止硬编码密码、API Key、密钥等\n\n`;
+    
+    prompt += `**三、性能与可维护性**\n`;
+    prompt += `1. 避免性能陷阱：循环中避免重复计算、数据库查询\n`;
+    prompt += `2. 依赖管理：避免引入不必要的依赖\n\n`;
+    
+    prompt += `**示例输出格式：**\n`;
+    prompt += `🔍 [AI Review] 建议：\n`;
+    prompt += `- 函数 \`processUserData\` 长达80行，建议拆分为多个小函数。\n`;
+    prompt += `- 变量名 \`res\` 不够清晰，建议改为 \`userDataResponse\`。\n`;
+    prompt += `- 检测到未处理的异常，请添加异常处理。\n`;
+    prompt += `- 此处字符串拼接可能存在XSS风险，建议对用户输入进行转义。\n\n`;
+    
+    prompt += `回复格式：\n1. [具体改进建议或PASS]\n2. [具体改进建议或PASS]\n...\n\n`;
+    prompt += `要求：中文，每意见<100字，无问题直接回复PASS，不要生成"无问题"、"代码很好"等无意义的评论`;
     
     return prompt;
   }
@@ -1216,11 +1240,6 @@ class AICodeReviewer {
         return null;
       }
 
-      // 如果 AI 返回的内容太长，进行截断
-      if (review.length > 200) {
-        return review.substring(0, 200) + "...";
-      }
-
       return review;
     } catch (err) {
       console.error(`❌ 代码组审查失败:`, err.message);
@@ -1240,38 +1259,63 @@ class AICodeReviewer {
     const codeContent = lines.map(line => line.content).join('\n');
     const lineCount = lines.length;
 
-    return `
-请审查以下新增代码组（这是一个完整的代码变更单元）：
+    return `🔍 AI代码审查 - 文件: ${fileName} (行${startLine}-${endLine})
 
-文件: ${fileName}
-行号范围: ${startLine}-${endLine} (共${lineCount}行)
-变更类型: 新增代码
 代码内容:
 ${codeContent}
 
-请从以下角度分析这一组新增代码：
-1. 代码质量：命名规范、语法正确性、逻辑合理性
-2. 安全性：潜在的安全风险
-3. 性能：性能影响
-4. 最佳实践：是否符合编码规范
-5. 代码结构：是否合理
-6. 整体逻辑：这几行代码作为一个整体是否逻辑清晰
+请按照以下规则进行专业代码审查:
 
-重要提示：
-- 这是新增的代码，请重点关注新代码的质量和逻辑
-- 不要分析删除的代码，只关注新增的代码
-- 分析整个代码段的逻辑，不要单独分析每一行
-- 关注代码段之间的关联性和整体设计
-- 你的评论将显示在最后一行（第${endLine}行），代表整个代码段的审查意见
-- 如果代码完全没有问题，请直接回复"PASS"
-- 如果发现问题，请给出具体的改进建议
+**一、基本代码质量规则（AI 可自动检测）**
+1. 命名规范
+   - 变量、函数、类名应具有描述性，避免使用缩写或模糊命名（如 a, temp, data1）
+   - 遵循项目命名约定（如：camelCase, snake_case, PascalCase）
+   - 布尔变量建议以 is, has, can 开头
 
-要求：
-- 用中文回复
-- 简洁明了，不超过 150 字
-- 重点关注新增代码的逻辑和设计
-- 无问题时不生成任何评论，直接回复PASS
-`;
+2. 函数职责单一
+   - 一个函数只做一件事，避免超过 50 行代码
+   - 函数参数建议不超过 4 个，否则考虑使用对象封装
+
+3. 避免重复代码（DRY）
+   - AI 可识别相似代码块，提示提取为公共函数或组件
+
+4. 注释与文档
+   - 公共函数/类必须有注释说明功能、参数、返回值
+   - 避免无意义注释（如 i++ // increment i）
+   - 复杂逻辑必须有解释性注释
+
+5. 错误处理
+   - 所有可能出错的操作（如网络请求、文件读写）必须有异常处理
+   - 不要忽略异常（如 catch(e) {}）
+
+**二、安全相关规则（AI 可重点扫描）**
+1. 输入验证
+   - 所有外部输入（API 参数、表单、URL）必须验证和清理
+   - 防止 SQL 注入、XSS、命令注入等
+
+2. 敏感信息
+   - 禁止在代码中硬编码密码、API Key、密钥等
+   - 检查 .env, config 文件是否被误提交
+
+**三、性能与可维护性**
+1. 避免性能陷阱
+   - 循环中避免重复计算、数据库查询、大对象创建
+   - 使用缓存、索引、分页等优化手段
+
+2. 依赖管理
+   - 避免引入不必要的依赖
+   - 检查是否有过时或已废弃的库
+
+**示例输出格式模版：**
+🔍 [AI Review] 建议：
+- 函数 \`processUserData\` 长达 80 行，建议拆分为多个小函数以提高可读性。
+- 变量名 \`res\` 不够清晰，建议改为 \`userDataResponse\`。
+- 检测到未处理的异常，请在 \`fetch\` 调用后添加 \`.catch()\` 或 try-catch。
+- 此处字符串拼接可能存在 XSS 风险，建议对用户输入进行转义。
+
+如果代码完全没有问题，请直接回复"PASS"。
+
+要求：中文，简洁明了，每个建议不超过100字。`;
   }
 
   /**
