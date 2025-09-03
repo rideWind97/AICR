@@ -65,17 +65,18 @@ class GitLabAPI {
    * @param {number} mrIid - MR IID
    * @param {Array} changes - 代码变更数组
    * @param {Array} fileReviews - 每个文件的审查内容数组
+   * @param {Array} existingComments - 已有的评论数组
    * @returns {Promise<void>}
    */
-  async postInlineCommentsToMR(projectId, mrIid, changes, fileReviews) {
+  async postInlineCommentsToMR(projectId, mrIid, changes, fileReviews, existingComments = []) {
     try {
       // 将 AI 审查内容按文件分组，为每行生成针对性评论
-      const fileComments = this.parseReviewToFileComments(changes, fileReviews);
+      const fileComments = this.parseReviewToFileComments(changes, fileReviews, existingComments);
       
       // 为每个文件添加行内评论
       for (const fileComment of fileComments) {
         if (fileComment.comments.length > 0) {
-          await this.addInlineCommentsToFile(projectId, mrIid, fileComment);
+          await this.addInlineCommentsToFile(projectId, mrIid, fileComment, existingComments);
         }
       }
       
@@ -90,9 +91,10 @@ class GitLabAPI {
    * 解析 AI 审查内容，按文件分组并生成针对性行内评论
    * @param {Array} changes - 代码变更数组
    * @param {Array} fileReviews - 每个文件的审查内容数组
+   * @param {Array} existingComments - 已有的评论数组
    * @returns {Array} 按文件分组的评论数组
    */
-  parseReviewToFileComments(changes, fileReviews) {
+  parseReviewToFileComments(changes, fileReviews, existingComments = []) {
     const fileComments = [];
     
     for (const change of changes) {
@@ -119,6 +121,14 @@ class GitLabAPI {
       // 因为 AI 已经为每个代码变更单元生成了评论
       for (const lineReview of fileReview.review) {
         if (lineReview.isGroupEnd) {
+          // 检查该行是否已经有评论
+          const hasExistingComment = this.checkIfLineHasComment(existingComments, filePath, lineReview.lineNumber);
+          
+          if (hasExistingComment) {
+            Logger.info(`⚠️ 文件 ${filePath} 第 ${lineReview.lineNumber} 行已有评论，跳过重复评论`);
+            continue;
+          }
+          
           Logger.info(`📝 为文件 ${filePath} 第 ${lineReview.lineNumber} 行（代码变更单元结尾）添加评论: ${lineReview.review.substring(0, 50)}...`);
           
           fileComment.comments.push({
@@ -148,19 +158,53 @@ class GitLabAPI {
   }
 
   /**
+   * 检查指定文件的指定行是否已经有评论
+   * @param {Array} existingComments - 已有的评论数组
+   * @param {string} filePath - 文件路径
+   * @param {number} lineNumber - 行号
+   * @returns {boolean} 是否已有评论
+   */
+  checkIfLineHasComment(existingComments, filePath, lineNumber) {
+    return existingComments.some(comment => {
+      // 检查是否是同一文件的同一行
+      if (comment.filePath === filePath && comment.line === lineNumber) {
+        return true;
+      }
+      
+      // 检查是否是行号范围内的评论
+      if (comment.filePath === filePath && 
+          comment.startLine && comment.endLine && 
+          lineNumber >= comment.startLine && lineNumber <= comment.endLine) {
+        return true;
+      }
+      
+      return false;
+    });
+  }
+
+  /**
    * 为单个文件添加行内评论
    * @param {number} projectId - 项目 ID
    * @param {number} mrIid - MR IID
    * @param {Object} fileComment - 文件评论对象
+   * @param {Array} existingComments - 已有的评论数组
    * @returns {Promise<void>}
    */
-  async addInlineCommentsToFile(projectId, mrIid, fileComment) {
+  async addInlineCommentsToFile(projectId, mrIid, fileComment, existingComments = []) {
     try {
       Logger.info(`📝 为文件 ${fileComment.filePath} 添加行内评论...`);
       
       // 为每个评论行添加行内评论
       for (const comment of fileComment.comments) {
         try {
+          // 发布前再次检查是否已有评论（双重保险）
+          const hasExistingComment = this.checkIfLineHasComment(existingComments, fileComment.filePath, comment.line);
+          
+          if (hasExistingComment) {
+            Logger.info(`⚠️ 发布前检查：文件 ${fileComment.filePath} 第 ${comment.line} 行已有评论，跳过发布`);
+            continue;
+          }
+          
           Logger.info(`🔍 添加行内评论: 行 ${comment.line}, 文件: ${comment.position.new_path}`);
           
           // 使用 /discussions 端点，通过 position 参数在具体代码行下添加评论

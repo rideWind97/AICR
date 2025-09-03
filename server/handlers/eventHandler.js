@@ -197,7 +197,7 @@ class EventHandler {
       const fileReviews = await this.aiReviewer.generateCodeReview(changes, existingComments);
       
       // 使用针对性行内评论功能，为每行代码添加具体的审查意见
-      await this.gitlabAPI.postInlineCommentsToMR(projectId, mrIid, changes, fileReviews);
+      await this.gitlabAPI.postInlineCommentsToMR(projectId, mrIid, changes, fileReviews, existingComments);
 
       Logger.info('代码审查任务完成', {
         taskId,
