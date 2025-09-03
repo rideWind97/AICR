@@ -1,5 +1,5 @@
 const express = require('express');
-const EventHandler = require('../handlers/eventHandler');
+const GitlabEventHandler = require('../handlers/gitlabEventHandler');
 const GitHubEventHandler = require('../handlers/githubEventHandler');
 const Logger = require('../utils/logger');
 
@@ -23,10 +23,10 @@ router.get('/health', (req, res) => {
  */
 router.get('/tasks', (req, res) => {
   try {
-    const eventHandler = new EventHandler();
+    const gitlabEventHandler = new GitlabEventHandler();
     const githubEventHandler = new GitHubEventHandler();
     
-    const gitlabTasks = eventHandler.getAllTaskStatus();
+    const gitlabTasks = gitlabEventHandler.getAllTaskStatus();
     const githubTasks = githubEventHandler.getAllTaskStatus();
     
     const allTasks = [...gitlabTasks, ...githubTasks];
@@ -55,10 +55,10 @@ router.get('/tasks', (req, res) => {
 router.get('/tasks/:taskId', (req, res) => {
   try {
     const { taskId } = req.params;
-    const eventHandler = new EventHandler();
+    const gitlabEventHandler = new SimpleEventHandler();
     const githubEventHandler = new GitHubEventHandler();
     
-    let task = eventHandler.getTaskStatus(taskId);
+    let task = gitlabEventHandler.getTaskStatus(taskId);
     if (!task) {
       task = githubEventHandler.getTaskStatus(taskId);
     }
@@ -89,8 +89,8 @@ router.get('/tasks/:taskId', (req, res) => {
 router.get('/projects/:projectId/tasks', (req, res) => {
   try {
     const { projectId } = req.params;
-    const eventHandler = new EventHandler();
-    const tasks = eventHandler.getProjectTaskStatus(parseInt(projectId));
+    const gitlabEventHandler = new SimpleEventHandler();
+    const tasks = gitlabEventHandler.getProjectTaskStatus(parseInt(projectId));
     
     res.json({
       success: true,
@@ -134,13 +134,13 @@ router.post('/gitlab/webhook', async (req, res) => {
       });
     }
 
-    const eventHandler = new EventHandler();
+    const gitlabEventHandler = new SimpleEventHandler();
     let result;
 
     if (eventType === 'push') {
-      result = await eventHandler.handlePushEvent(event);
+      result = await gitlabEventHandler.handlePushEvent(event);
     } else if (eventType === 'merge_request') {
-      result = await eventHandler.handleMergeRequestEvent(event);
+      result = await gitlabEventHandler.handleMergeRequestEvent(event);
     }
 
     Logger.endTimer('Webhook处理', startTime, {
