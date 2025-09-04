@@ -1,6 +1,6 @@
 const Logger = require('../utils/logger');
 const AICodeReviewer = require('../services/aiCodeReviewer');
-const SimpleGitlabCR = require('../services/simpleGitlabCR');
+const GitlabCR = require('../services/gitlabAPI');
 
 /**
  * 极简化事件处理器
@@ -8,7 +8,7 @@ const SimpleGitlabCR = require('../services/simpleGitlabCR');
 class SimpleEventHandler {
   constructor() {
     this.aiReviewer = new AICodeReviewer();
-    this.gitlabCR = new SimpleGitlabCR();
+    this.gitlabCR = new GitlabCR();
     this.tasks = new Map(); // 简单的任务状态管理
   }
 
