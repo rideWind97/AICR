@@ -1,4 +1,4 @@
-require('dotenv').config();
+require("dotenv").config();
 const axios = require("axios");
 const Logger = require("./server/utils/logger");
 const { getLocalIP } = require("./server/utils/helpers");
@@ -9,44 +9,27 @@ const WEBHOOK_PATH = "/api/gitlab/webhook";
 
 // 模拟 GitLab webhook 数据
 const webhookData = {
-  changes: {
-    author_id: { current: 796, previous: null },
-    created_at: { current: "2025-09-03 21:45:27 +0800", previous: null },
-    description: { current: "", previous: null },
-    id: { current: 106632, previous: null },
-    iid: { current: 15, previous: null },
-    merge_params: {
-      current: { force_remove_source_branch: "1" },
-      previous: {},
-    },
-    source_branch: { current: "feat_singleGitlab", previous: null },
-    source_project_id: { current: 2205, previous: null },
-    target_branch: { current: "master", previous: null },
-    target_project_id: { current: 2205, previous: null },
-    title: { current: "feat: 重构gitlab", previous: null },
-    total_time_spent: { current: 0, previous: null },
-    updated_at: { current: "2025-09-03 21:45:27 +0800", previous: null },
-  },
+  changes: { total_time_spent: { current: 0, previous: null } },
   event_type: "merge_request",
   labels: [],
   object_attributes: {
-    action: "open",
+    action: "update",
     assignee_id: null,
     assignee_ids: [],
     author_id: 796,
-    created_at: "2025-09-03 21:45:27 +0800",
+    created_at: "2025-09-04 07:10:26 UTC",
     description: "",
     head_pipeline_id: null,
     human_time_estimate: null,
     human_total_time_spent: null,
-    id: 106632,
-    iid: 15,
+    id: 106678,
+    iid: 16,
     last_commit: {
       author: { email: "shengjunpeng@jzwg.com", name: "shengjunpeng" },
-      id: "1946787007e1b36aef21d41c06956711251ef0b0",
-      message: "feat: 重构gitlab\n",
-      timestamp: "2025-09-03T21:45:02+08:00",
-      url: "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr/commit/1946787007e1b36aef21d41c06956711251ef0b0",
+      id: "771451a2ab16277ecde00572571a8e1996b36e91",
+      message: "fix: ceshi\n",
+      timestamp: "2025-09-04T15:31:08+08:00",
+      url: "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr/commit/771451a2ab16277ecde00572571a8e1996b36e91",
     },
     last_edited_at: null,
     last_edited_by_id: null,
@@ -57,11 +40,12 @@ const webhookData = {
     merge_user_id: null,
     merge_when_pipeline_succeeds: false,
     milestone_id: null,
+    oldrev: "3a0fa7fc8505a5602e37218a1b14276ebd307ebd",
     source: {
       avatar_url: null,
       ci_config_path: null,
       default_branch: "master",
-      description: "",
+      description: "使用AI来自动CR代码",
       git_http_url:
         "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr.git",
       git_ssh_url: "git@gitlab.lanhuapp.com:master/frontend/frontend-ai-cr.git",
@@ -69,7 +53,7 @@ const webhookData = {
       http_url:
         "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr.git",
       id: 2205,
-      name: "frontend-ai-cr",
+      name: "ai-code-reviewer",
       namespace: "frontend",
       path_with_namespace: "master/frontend/frontend-ai-cr",
       ssh_url: "git@gitlab.lanhuapp.com:master/frontend/frontend-ai-cr.git",
@@ -77,14 +61,14 @@ const webhookData = {
       visibility_level: 0,
       web_url: "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr",
     },
-    source_branch: "feat_singleGitlab",
+    source_branch: "fix_test_cr",
     source_project_id: 2205,
     state: "opened",
     target: {
       avatar_url: null,
       ci_config_path: null,
       default_branch: "master",
-      description: "",
+      description: "使用AI来自动CR代码",
       git_http_url:
         "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr.git",
       git_ssh_url: "git@gitlab.lanhuapp.com:master/frontend/frontend-ai-cr.git",
@@ -92,7 +76,7 @@ const webhookData = {
       http_url:
         "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr.git",
       id: 2205,
-      name: "frontend-ai-cr",
+      name: "ai-code-reviewer",
       namespace: "frontend",
       path_with_namespace: "master/frontend/frontend-ai-cr",
       ssh_url: "git@gitlab.lanhuapp.com:master/frontend/frontend-ai-cr.git",
@@ -103,11 +87,11 @@ const webhookData = {
     target_branch: "master",
     target_project_id: 2205,
     time_estimate: 0,
-    title: "feat: 重构gitlab",
+    title: "Fix test cr",
     total_time_spent: 0,
-    updated_at: "2025-09-03 21:45:27 +0800",
+    updated_at: "2025-09-04 07:31:11 UTC",
     updated_by_id: null,
-    url: "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr/merge_requests/15",
+    url: "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr/merge_requests/16",
     work_in_progress: false,
   },
   object_kind: "merge_request",
@@ -115,14 +99,14 @@ const webhookData = {
     avatar_url: null,
     ci_config_path: null,
     default_branch: "master",
-    description: "",
+    description: "使用AI来自动CR代码",
     git_http_url:
       "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr.git",
     git_ssh_url: "git@gitlab.lanhuapp.com:master/frontend/frontend-ai-cr.git",
     homepage: "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr",
     http_url: "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr.git",
     id: 2205,
-    name: "frontend-ai-cr",
+    name: "ai-code-reviewer",
     namespace: "frontend",
     path_with_namespace: "master/frontend/frontend-ai-cr",
     ssh_url: "git@gitlab.lanhuapp.com:master/frontend/frontend-ai-cr.git",
@@ -131,9 +115,9 @@ const webhookData = {
     web_url: "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr",
   },
   repository: {
-    description: "",
+    description: "使用AI来自动CR代码",
     homepage: "https://gitlab.lanhuapp.com/master/frontend/frontend-ai-cr",
-    name: "frontend-ai-cr",
+    name: "ai-code-reviewer",
     url: "git@gitlab.lanhuapp.com:master/frontend/frontend-ai-cr.git",
   },
   user: {

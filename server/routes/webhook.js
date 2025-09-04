@@ -55,7 +55,7 @@ router.get('/tasks', (req, res) => {
 router.get('/tasks/:taskId', (req, res) => {
   try {
     const { taskId } = req.params;
-    const gitlabEventHandler = new SimpleEventHandler();
+    const gitlabEventHandler = new GitlabEventHandler();
     const githubEventHandler = new GitHubEventHandler();
     
     let task = gitlabEventHandler.getTaskStatus(taskId);
@@ -89,7 +89,7 @@ router.get('/tasks/:taskId', (req, res) => {
 router.get('/projects/:projectId/tasks', (req, res) => {
   try {
     const { projectId } = req.params;
-    const gitlabEventHandler = new SimpleEventHandler();
+    const gitlabEventHandler = new GitlabEventHandler();
     const tasks = gitlabEventHandler.getProjectTaskStatus(parseInt(projectId));
     
     res.json({
@@ -134,7 +134,7 @@ router.post('/gitlab/webhook', async (req, res) => {
       });
     }
 
-    const gitlabEventHandler = new SimpleEventHandler();
+    const gitlabEventHandler = new GitlabEventHandler();
     let result;
 
     if (eventType === 'push') {

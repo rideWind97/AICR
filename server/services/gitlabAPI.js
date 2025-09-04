@@ -92,7 +92,6 @@ class SimpleGitlabCR {
       for (const note of allNotes) {
         // 检查是否有位置信息（行内评论）
         if (note.position && note.position.new_line) {
-          Logger.info(`📝 发现行内评论: 文件 ${note.position.new_path}, 行 ${note.position.new_line}`);
           comments.push({
             filePath: note.position.new_path,
             line: note.position.new_line,
@@ -104,7 +103,6 @@ class SimpleGitlabCR {
           });
         } else if (note.body && note.body.includes('AI Review')) {
           // 检查是否是 AI 生成的评论
-          Logger.info(`🤖 发现 AI 评论: ${note.body.substring(0, 50)}...`);
           comments.push({
             filePath: 'general',
             line: null,
