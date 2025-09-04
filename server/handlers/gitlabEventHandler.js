@@ -5,7 +5,7 @@ const GitlabCR = require('../services/gitlabAPI');
 /**
  * 极简化事件处理器
  */
-class SimpleEventHandler {
+class GitlabEventHandler {
   constructor() {
     this.aiReviewer = new AICodeReviewer();
     this.gitlabCR = new GitlabCR();
@@ -84,6 +84,20 @@ class SimpleEventHandler {
       // 生成 AI 代码审查
       const fileReviews = await this.aiReviewer.generateCodeReview(changes, existingComments);
       
+      // 打印所有文件审查结果
+      Logger.info(`🎯 所有文件审查结果汇总:`, {
+        totalFiles: changes.length,
+        reviewedFiles: fileReviews.length,
+        fileReviews: fileReviews.map(fr => ({
+          filePath: fr.filePath,
+          reviewCount: fr.review ? fr.review.length : 0,
+          reviews: fr.review ? fr.review.map(r => ({
+            lineNumber: r.lineNumber,
+            review: r.review.substring(0, 100) + '...'
+          })) : []
+        }))
+      });
+      
       if (!fileReviews.length) {
         Logger.info('没有生成审查内容，跳过发布');
         return;
@@ -127,4 +141,4 @@ class SimpleEventHandler {
   }
 }
 
-module.exports = SimpleEventHandler;
+module.exports = GitlabEventHandler;
