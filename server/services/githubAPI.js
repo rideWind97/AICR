@@ -59,6 +59,12 @@ class GitHubAPI {
       
       const prInfo = prResponse.data;
       
+      // 检查PR标题是否包含"ignore cr"，如果包含则跳过代码审查
+      if (prInfo.title && prInfo.title.toLowerCase().includes('ignore cr')) {
+        Logger.info(`🚫 PR标题包含"ignore cr"，跳过代码审查: ${prInfo.title}`);
+        return { skipReview: true, title: prInfo.title };
+      }
+      
       const filesResponse = await axios.get(
         `${this.baseURL}/repos/${owner}/${repo}/pulls/${prNumber}/files`,
         { headers: this.headers, timeout: 10000 }
@@ -160,6 +166,24 @@ class GitHubAPI {
     } catch (err) {
       Logger.error(`为文件 ${fileComment.filePath} 添加行内评论失败`, err);
       throw err;
+    }
+  }
+
+  /**
+   * 获取已有评论
+   */
+  async getExistingComments(owner, repo, prNumber) {
+    try {
+      const response = await axios.get(
+        `${this.baseURL}/repos/${owner}/${repo}/pulls/${prNumber}/comments`,
+        { headers: this.headers, timeout: 10000 }
+      );
+      
+      return response.data || [];
+      
+    } catch (err) {
+      Logger.error('获取已有评论失败', err);
+      return [];
     }
   }
 

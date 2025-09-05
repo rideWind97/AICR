@@ -69,6 +69,13 @@ class GitlabEventHandler {
 
       // 获取 MR 变更
       const changes = await this.gitlabCR.getMRChanges(projectId, mrIid);
+      
+      // 检查是否需要跳过代码审查
+      if (changes && changes.skipReview) {
+        Logger.info(`🚫 跳过代码审查: ${changes.title}`);
+        return;
+      }
+      
       if (!changes.length) {
         Logger.info('没有代码变更，跳过审查');
         return;
