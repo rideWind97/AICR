@@ -26,6 +26,12 @@ class SimpleGitlabCR {
       
       const mrInfo = mrResponse.data;
       
+      // 检查MR标题是否包含"ignore cr"，如果包含则跳过代码审查
+      if (mrInfo.title && mrInfo.title.toLowerCase().includes('ignore cr')) {
+        Logger.info(`🚫 MR标题包含"ignore cr"，跳过代码审查: ${mrInfo.title}`);
+        return { skipReview: true, title: mrInfo.title };
+      }
+      
       // 获取 MR 变更
       const changesResponse = await axios.get(
         `${this.baseURL}/api/v4/projects/${projectId}/merge_requests/${mrIid}/changes`,
@@ -185,6 +191,20 @@ class SimpleGitlabCR {
     try {
       // 获取变更和已有评论
       const changes = await this.getMRChanges(projectId, mrIid);
+      
+      // 检查是否需要跳过代码审查
+      if (changes && changes.skipReview) {
+        Logger.info(`🚫 跳过代码审查: ${changes.title}`);
+        return {
+          successCount: 0,
+          skippedCount: 0,
+          totalProcessed: 0,
+          filesProcessed: 0,
+          skipped: true,
+          reason: 'MR标题包含"ignore cr"'
+        };
+      }
+      
       const existingComments = await this.getExistingComments(projectId, mrIid);
       
       if (!changes.length) {

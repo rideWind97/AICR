@@ -94,8 +94,37 @@ class GitHubEventHandler {
 
       Logger.info('开始处理GitHub PR事件', { owner, repo, prNumber, action });
 
+      // 先获取PR变更内容以检查标题
+      const changes = await this.githubAPI.getPRChanges(owner, repo, prNumber);
+      
+      // 检查是否需要跳过代码审查（优先检查）
+      if (changes && changes.skipReview) {
+        Logger.info(`🚫 跳过代码审查: ${changes.title}`);
+        return {
+          success: true,
+          message: 'Code review skipped - PR title contains "ignore cr"',
+          owner,
+          repo,
+          pr_number: prNumber,
+          skipped: true,
+          reason: 'PR标题包含"ignore cr"'
+        };
+      }
+
       // 检查PR的大小限制
       const sizeCheck = await this.checkPRSizeLimits(owner, repo, prNumber);
+      if (sizeCheck.skipReview) {
+        Logger.info(`🚫 跳过代码审查: ${changes.title}`);
+        return {
+          success: true,
+          message: 'Code review skipped - PR title contains "ignore cr"',
+          owner,
+          repo,
+          pr_number: prNumber,
+          skipped: true,
+          reason: 'PR标题包含"ignore cr"'
+        };
+      }
       if (!sizeCheck.withinLimits) {
         Logger.warn('PR超出数量限制，跳过处理', {
           owner,
@@ -106,9 +135,7 @@ class GitHubEventHandler {
         });
         return { message: 'PR too large for review' };
       }
-
-      // 获取PR变更内容
-      const changes = await this.githubAPI.getPRChanges(owner, repo, prNumber);
+      
       if (!changes || changes.length === 0) {
         Logger.warn('PR没有变更内容', { owner, repo, prNumber });
         return { message: 'No changes to review' };
@@ -161,6 +188,11 @@ class GitHubEventHandler {
         return { withinLimits: false, fileCount: 0, lineCount: 0 };
       }
 
+      // 如果PR需要跳过审查，则不需要检查大小限制
+      if (changes.skipReview) {
+        return { withinLimits: true, fileCount: 0, lineCount: 0, skipReview: true };
+      }
+
       const fileCount = changes.length;
       const lineCount = changes.reduce((total, change) => {
         return total + (change.additions || 0) + (change.deletions || 0);
@@ -208,6 +240,14 @@ class GitHubEventHandler {
       
       // 获取PR变更内容
       const changes = await this.githubAPI.getPRChanges(owner, repo, prNumber);
+      
+      // 检查是否需要跳过代码审查
+      if (changes && changes.skipReview) {
+        Logger.info(`🚫 跳过代码审查: ${changes.title}`);
+        this.updateTaskStatus(taskId, 'completed', `Code review skipped - PR title contains "ignore cr"`);
+        return;
+      }
+      
       if (!changes || changes.length === 0) {
         this.updateTaskStatus(taskId, 'completed', 'No changes to review');
         return;
