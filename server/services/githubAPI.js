@@ -1,5 +1,6 @@
 const axios = require('axios');
 const Logger = require('../utils/logger');
+const { ignoreCr } = require('../config');
 
 /**
  * GitHub API 操作服务类
@@ -59,9 +60,9 @@ class GitHubAPI {
       
       const prInfo = prResponse.data;
       
-      // 检查PR标题是否包含"ignore cr"，如果包含则跳过代码审查
-      if (prInfo.title && prInfo.title.toLowerCase().includes('ignore cr')) {
-        Logger.info(`🚫 PR标题包含"ignore cr"，跳过代码审查: ${prInfo.title}`);
+      // 检查PR标题是否包含"no-cr"，如果包含则跳过代码审查
+      if (prInfo.title && prInfo.title.toLowerCase().includes(ignoreCr)) {
+        Logger.info(`🚫 PR标题包含"no-cr"，跳过代码审查: ${prInfo.title}`);
         return { skipReview: true, title: prInfo.title };
       }
       

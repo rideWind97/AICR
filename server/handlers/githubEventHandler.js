@@ -102,12 +102,12 @@ class GitHubEventHandler {
         Logger.info(`🚫 跳过代码审查: ${changes.title}`);
         return {
           success: true,
-          message: 'Code review skipped - PR title contains "ignore cr"',
+          message: 'Code review skipped - PR title contains "no-cr"',
           owner,
           repo,
           pr_number: prNumber,
           skipped: true,
-          reason: 'PR标题包含"ignore cr"'
+          reason: 'PR标题包含"no-cr"'
         };
       }
 
@@ -117,12 +117,12 @@ class GitHubEventHandler {
         Logger.info(`🚫 跳过代码审查: ${changes.title}`);
         return {
           success: true,
-          message: 'Code review skipped - PR title contains "ignore cr"',
+          message: 'Code review skipped - PR title contains "no-cr"',
           owner,
           repo,
           pr_number: prNumber,
           skipped: true,
-          reason: 'PR标题包含"ignore cr"'
+          reason: 'PR标题包含"no-cr"'
         };
       }
       if (!sizeCheck.withinLimits) {
@@ -244,7 +244,7 @@ class GitHubEventHandler {
       // 检查是否需要跳过代码审查
       if (changes && changes.skipReview) {
         Logger.info(`🚫 跳过代码审查: ${changes.title}`);
-        this.updateTaskStatus(taskId, 'completed', `Code review skipped - PR title contains "ignore cr"`);
+        this.updateTaskStatus(taskId, 'completed', `Code review skipped - PR title contains "no-cr"`);
         return;
       }
       
