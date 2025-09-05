@@ -1,5 +1,6 @@
 const axios = require('axios');
 const Logger = require('../utils/logger');
+const { ignoreCr } = require('../config');
 
 /**
  * 极简化 GitLab 代码审查服务
@@ -26,9 +27,9 @@ class SimpleGitlabCR {
       
       const mrInfo = mrResponse.data;
       
-      // 检查MR标题是否包含"ignore cr"，如果包含则跳过代码审查
-      if (mrInfo.title && mrInfo.title.toLowerCase().includes('ignore cr')) {
-        Logger.info(`🚫 MR标题包含"ignore cr"，跳过代码审查: ${mrInfo.title}`);
+      // 检查MR标题是否包含"no-cr"，如果包含则跳过代码审查
+      if (mrInfo.title && mrInfo.title.toLowerCase().includes(ignoreCr)) {
+        Logger.info(`🚫 MR标题包含"no-cr"，跳过代码审查: ${mrInfo.title}`);
         return { skipReview: true, title: mrInfo.title };
       }
       
@@ -201,7 +202,7 @@ class SimpleGitlabCR {
           totalProcessed: 0,
           filesProcessed: 0,
           skipped: true,
-          reason: 'MR标题包含"ignore cr"'
+          reason: 'MR标题包含"no-cr"'
         };
       }
       
