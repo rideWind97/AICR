@@ -395,7 +395,7 @@ class AICodeReviewer {
         batchSize: batch.length,
       });
       // 降级为单个处理
-      return this.processGroupsIndividually(fileName, batch, existingComments);
+      return this.processGroupsIndividually(fileName, batch, existingComments, options);
     }
   }
 
@@ -461,7 +461,7 @@ class AICodeReviewer {
    * @param {ExistingComment[]} existingComments - 已有评论数组
    * @returns {Promise<ReviewResult[]>} 审查结果数组
    */
-  async processGroupsIndividually(fileName, groups, existingComments) {
+  async processGroupsIndividually(fileName, groups, existingComments, options = {}) {
     const reviews = [];
 
     for (const group of groups) {
@@ -469,7 +469,8 @@ class AICodeReviewer {
         const review = await this.aiApiService.generateGroupReview(
           fileName,
           group,
-          existingComments
+          existingComments,
+          options
         );
         if (review && review.trim() !== "") {
           const lastLine = group.lines[group.lines.length - 1];
