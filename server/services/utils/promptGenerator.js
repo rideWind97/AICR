@@ -61,11 +61,12 @@ class PromptGenerator {
       // 尝试获取项目中的promptGenerator.js文件
       const promptFileContent = await gitlabAPI.getProjectFile(
         projectId, 
-        'aiCodeReviewPrompt.js', 
+        'aiCodeReviewPrompt.cjs', 
         ref
       );
 
       if (!promptFileContent) {
+        console.log(`❌ 项目自定义prompt文件不存在: ${projectId}`);
         return null;
       }
 
