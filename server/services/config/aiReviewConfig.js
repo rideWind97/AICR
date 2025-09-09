@@ -13,10 +13,10 @@ const AI_REVIEW_CONFIG = {
 
   // 性能优化配置
   performance: {
-    maxConcurrentFiles: parseInt(process.env.MAX_FILES_CONCURRENT) || 5,
+    maxConcurrentFiles: parseInt(process.env.MAX_FILES_CONCURRENT) || 10,
     maxGroupsPerBatch: parseInt(process.env.MAX_GROUPS_PER_BATCH) || 15,
-    maxLinesPerGroup: parseInt(process.env.MAX_LINES_PER_GROUP) || 40,
-    maxConcurrentAI: parseInt(process.env.MAX_CONCURRENT_AI) || 3,
+    maxLinesPerGroup: parseInt(process.env.MAX_LINES_PER_GROUP) || 1000,
+    maxConcurrentAI: parseInt(process.env.MAX_CONCURRENT_AI) || 10,
   },
 
   // 缓存配置
@@ -30,7 +30,7 @@ const AI_REVIEW_CONFIG = {
     ignoredExtensions: [
       ".css", ".scss", ".sass", ".less", ".styl",
       ".md", ".markdown", ".mdx", ".txt", ".rst", ".adoc", ".doc", ".docx", ".pdf",
-      ".yml", ".yaml", ".toml", ".ini", ".conf", ".cfg", ".config",
+      ".toml", ".ini", ".conf", ".cfg", ".config",
     ],
     specialHandling: {
       packageFiles: {
