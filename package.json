@@ -9,7 +9,8 @@
     "monitor": "node scripts/monitor.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "echo \"Linting not configured\" && exit 1",
-    "format": "echo \"Formatting not configured\" && exit 1"
+    "format": "echo \"Formatting not configured\" && exit 1",
+    "cr": "node test-webhook.js"
   },
   "keywords": [
     "gitlab",
